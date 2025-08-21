@@ -14,7 +14,9 @@
   * hmmer v3.1b2: `conda install bioconda::hmmer`
 
 ## Running the code
-The order of job submissions is as follows:
+- Make sure to edit the code IN YOUR REMOTE GITHUB REPO ONLY and change the queueing system section at the top accordingly
+- Run the scripts in the parent directory to the cloned github repo (so the filepaths remain relative)
+- The order of job submissions is as follows:
   1. 01_pychopper.sh: This script reorients and quality-score trims cDNA reads into the same orientation
      * This script takes in 2 extra files, which are hardcoded into the script:
        * one which has the orientation of adapters sequences listed (`M13_config_for_pychopper.txt`)
