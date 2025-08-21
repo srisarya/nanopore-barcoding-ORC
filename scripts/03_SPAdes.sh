@@ -71,5 +71,7 @@ mv "$contigs_file" "$renamed_contigs"
 
 # Use seqkit replace to modify headers
 # First replace: capture NODE info and reformat, then prepend identifier
+source activate seqkit
+
 seqkit replace -p '^>NODE_(\d+)_length_(\d+)_cov_([0-9.]+)' -r ">${identifier}_NODE\${1}_length\${2}_cov\${3}" "$renamed_contigs" | \
 seqkit replace -p ' ' -r '_' > "${output_dir}/${identifier}.contigs.renamed.fa"
