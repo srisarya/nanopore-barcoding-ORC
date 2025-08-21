@@ -75,3 +75,9 @@ source activate seqkit
 
 seqkit replace -p '^>NODE_(\d+)_length_(\d+)_cov_([0-9.]+)' -r ">${identifier}_NODE\${1}_length\${2}_cov\${3}" "$renamed_contigs" | \
 seqkit replace -p ' ' -r '_' > "${output_dir}/${identifier}.contigs.renamed.fa"
+
+# cleanup post SPAdes for easy of running
+
+mv "${output_dir}/${identifier}.contigs.renamed.fa" "${output_base_dir}/${identifier}.contigs.renamed.fa"
+tar czf "${output_dir}.tar.gz" "${output_dir}"
+rm -rf "${output_dir}"
