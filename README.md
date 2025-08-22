@@ -1,4 +1,4 @@
-# Field workshop on the taxonomy and natural history of freshwater and limno-terrestrial meiofauna
+# Field workshop on the taxonomy and natural history of freshwater and limno-terrestrial meiofauna 🪱 ⛰️
 ## *This is the code used to process COI/28S/18S amplicon data from the 2025 NERC/NHM Lake District Freshwater Meiofauna workshop*
 
 ## Installation and setup
@@ -12,6 +12,7 @@
   * barrnap v0.9: `conda install bioconda::barrnap`
   * seqtk v1.4-r122: `conda install bioconda::seqtk`
   * hmmer v3.1b2: `conda install bioconda::hmmer`
+  * bedtools v2.31.1: `conda install bioconda::bedtools"
 
 ## Running the code
 - Make sure to edit the code IN YOUR REMOTE GITHUB REPO ONLY and change the queueing system section at the top accordingly
