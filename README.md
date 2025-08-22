@@ -1,4 +1,4 @@
-# Field workshop on the taxonomy and natural history of freshwater and limno-terrestrial meiofauna 🪱 ⛰️
+# Field workshop on the taxonomy and natural history of freshwater and limno-terrestrial meiofauna 🪱 🏞️
 ## *This is the code used to process COI/28S/18S amplicon data from the 2025 NERC/NHM Lake District Freshwater Meiofauna workshop*
 
 ## Installation and setup
