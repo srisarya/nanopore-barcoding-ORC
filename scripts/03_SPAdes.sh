@@ -52,6 +52,7 @@ mkdir -p "${output_dir}"
 
 # Run SPAdes: this needs installing prior to running this code and adding to $PATH
 spades.py \
+ --isolate \
  -s ${file} \
  -t 24 \
  -o "${output_dir}"
