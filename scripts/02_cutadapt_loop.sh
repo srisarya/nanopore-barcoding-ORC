@@ -20,17 +20,9 @@ infile="$1"  # Input file from command line argument
 indir=$(dirname "$infile")
 filename=$(basename "$infile")
 
-# Extract dataset name by removing "pychopped_" prefix and ".gz" suffix
-if [[ "$filename" == pychopped_* ]]; then
-    dataset="${filename#pychopped_}"  # Remove "pychopped_" prefix
-    dataset="${dataset%.gz}"          # Remove ".gz" suffix
-else
-    echo "Warning: Input file doesn't follow expected pychopped_*.gz naming pattern"
-    # Fallback: use filename without extensions
-    dataset="${filename%.gz}"
-    dataset="${dataset%.fastq}"
-    dataset="${dataset%.fq}"
-fi
+# Extract dataset name by removing "pychopped_" prefix and all file extensions
+dataset="${filename#pychopped_}"      # Remove "pychopped_" prefix
+dataset="${dataset%_pass.fastq.gz}"  # Remove "_pass.fastq.gz" suffix
 
 # Create output directory in the parent directory of the pychopped folder
 parent_dir=$(dirname "$indir")
