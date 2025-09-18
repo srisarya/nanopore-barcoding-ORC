@@ -80,5 +80,8 @@ seqkit replace -p ' ' -r '_' > "${output_dir}/${identifier}.contigs.renamed.fa"
 # cleanup post SPAdes for easy of running
 
 mv "${output_dir}/${identifier}.contigs.renamed.fa" "${output_base_dir}/${identifier}.contigs.renamed.fa"
-tar czf "${output_dir}.tar.gz" "${output_dir}"
-rm -rf "${output_dir}"
+tar czf "${output_dir}.tar.gz" "${output_dir}" && rm -rf "${output_dir}" && {
+    echo "Archive created successfully"
+    echo "Attempting to delete: ${output_dir}"
+    rm -rf "${output_dir}" && echo "Directory deleted successfully" || echo "Failed to delete directory"
+}
