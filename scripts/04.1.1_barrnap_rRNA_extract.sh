@@ -18,14 +18,10 @@ fi
 input_base_dir="$1"  # assembled directory from command line
 basedir=$(dirname "$input_base_dir")  # Go up one level to get base directory
 output_base_dir="${basedir}/rRNAs"
-split_files="${basedir}/split_files"
-combined_rRNA="${basedir}/combined_rRNA"
 
 echo "Input base dir: ${input_base_dir}"
 echo "Base directory: ${basedir}"
 echo "Output base dir: ${output_base_dir}"
-echo "Split files dir: ${split_files}"
-echo "Combined rRNA dir: ${combined_rRNA}"
 
 # Create output directories
 mkdir -p "${output_base_dir}" "${split_files}" "${combined_rRNA}"
