@@ -29,8 +29,8 @@ parent_dir=$(dirname "$indir")
 outdir="$parent_dir/demuxed_keepadapters"
 
 # relative paths for adapters
-adapters_SP5=Lakes_meiofauna_workshop/adapters_hmms/M13_amplicon_indices_forward.fa
-adapters_SP27=Lakes_meiofauna_workshop/adapters_hmms/M13_amplicon_indices_reverse_rc.fa
+adapters_SP5=nanopore-barcoding-ORC/adapters_hmms/M13_amplicon_indices_forward.fa
+adapters_SP27=nanopore-barcoding-ORC/adapters_hmms/M13_amplicon_indices_reverse_rc.fa
 e_rate=0.2 # this can be changed if you like, but 0.2 is a good value for our adapter seqs where each is >=3bp different from the any other
 
 echo "Processing: $infile"
