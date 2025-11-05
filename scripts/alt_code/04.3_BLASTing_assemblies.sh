@@ -37,6 +37,14 @@ total_files=${#files[@]}
 
 # Get the filename for the current task (array is 1-indexed, bash arrays are 0-indexed)
 file="${files[$((SLURM_ARRAY_TASK_ID-1))]}"
+if [ -z "$file" ]; then
+    echo "Error: No file found for SLURM_ARRAY_TASK_ID=${SLURM_ARRAY_TASK_ID} (index out of range)"
+    exit 1
+fi
+if [ ! -f "$file" ]; then
+    echo "Error: File does not exist: $file"
+    exit 1
+fi
 filename=$(basename "$file")  # Extract just the filename without path
 echo "file being processed: $file"
 
