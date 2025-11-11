@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=primer_search
-#SBATCH --time=24:00:00
-#SBATCH --mem=4G
+#SBATCH --time=00:20:00
+#SBATCH --mem=2G
 #SBATCH --cpus-per-task=1
 #SBATCH --array=1-169
 
@@ -59,7 +59,7 @@ echo "Primer file: $PRIMER_FILE"
 source activate seqkit
 
 # Run the primer search script
-python3 nanopore-barcoding-ORC/scripts/checks_balances/primer_search.py \
+python3 nanopore-barcoding-ORC/scripts/checks_balances/primer_amplicon_search.py \
     --primers "$PRIMER_FILE" \
     --file "$INPUT_FILE" \
     --output "$OUTPUT_CSV"
