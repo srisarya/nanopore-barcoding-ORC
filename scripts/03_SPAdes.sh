@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=SPAdes_array
 #SBATCH --mem=24G
-#SBATCH --cpus-per-task=24
+#SBATCH --cpus-per-task=12
 #SBATCH --time=03:00:00
 #SBATCH --output=%x_%j.log
 #SBATCH --array=1-169
