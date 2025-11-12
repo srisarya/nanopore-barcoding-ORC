@@ -55,5 +55,3 @@ pychopper \
  -t 24 \
  -m edlib \
  "$infile" > "$outdir"/${basename_no_ext}_pass.fastq
-
- cat "$outdir"/${basename_no_ext}_pass.fastq "$outdir"/${basename_no_ext}_rescued.fastq | gzip > "$outfile"
