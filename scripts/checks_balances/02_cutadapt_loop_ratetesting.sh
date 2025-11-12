@@ -46,7 +46,7 @@ source activate cutadapt # v4.9
 echo "Starting first round of demultiplexing..."
 cutadapt \
  --action=none \
- -e "$e_rate" -j 24 \
+ -e "$e_rate" -j 24 --rc \
  -g file:"$adapters_SP5" \
  -o "$outdir"/SP5/{name}_"$dataset".fastq.gz \
  "$infile" \
@@ -76,7 +76,7 @@ while IFS= read -r identifier; do
     # Second round of demultiplexing with SP27 adapters
     cutadapt \
      --action=none \
-     -e "$e_rate" -j 24 \
+     -e "$e_rate" -j 24 --rc \
      -a file:"$adapters_SP27" \
      -o "$outdir"/SP27/{name}_"$identifier"_"$dataset".fastq.gz \
      "$outdir"/SP5/"$identifier"_"$dataset".fastq.gz \
