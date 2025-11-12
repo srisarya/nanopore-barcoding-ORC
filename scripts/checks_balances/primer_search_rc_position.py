@@ -3,8 +3,8 @@
 Primer Search Script for FASTA/FASTQ Files
 
 Searches for primer sequences in FASTA or FASTQ files (compressed or uncompressed)
-and outputs which primers are found in each read, their positions, and read lengths.
-Searches both forward and reverse complement orientations.
+and outputs which primers are found in each read. Searches both forward and reverse
+complement orientations automatically via seqkit.
 
 Usage:
     # Single file
@@ -22,26 +22,6 @@ import csv
 import argparse
 from pathlib import Path
 from collections import defaultdict
-import re
-
-
-def reverse_complement(seq):
-    """
-    Generate reverse complement of a DNA sequence.
-    Handles standard IUPAC ambiguity codes.
-    """
-    complement = {
-        'A': 'T', 'T': 'A', 'G': 'C', 'C': 'G',
-        'R': 'Y', 'Y': 'R', 'S': 'S', 'W': 'W',
-        'K': 'M', 'M': 'K', 'B': 'V', 'V': 'B',
-        'D': 'H', 'H': 'D', 'N': 'N',
-        # Lowercase versions
-        'a': 't', 't': 'a', 'g': 'c', 'c': 'g',
-        'r': 'y', 'y': 'r', 's': 's', 'w': 'w',
-        'k': 'm', 'm': 'k', 'b': 'v', 'v': 'b',
-        'd': 'h', 'h': 'd', 'n': 'n'
-    }
-    return ''.join(complement.get(base, base) for base in reversed(seq))
 
 
 def parse_fasta(fasta_file):
@@ -96,123 +76,65 @@ def detect_file_type(file_path):
     return None
 
 
-def get_sequences_from_file(file_path, file_type):
-    """
-    Extract all sequences from a FASTA/FASTQ file with their headers.
-    Returns dict: {header: sequence}
-    """
-    sequences = {}
-    
-    try:
-        # Use seqkit to extract sequences in tab-delimited format
-        if file_type in ['fasta.gz', 'fastq.gz']:
-            cmd = f"zcat {file_path} | seqkit fx2tab"
-        else:
-            cmd = f"seqkit fx2tab {file_path}"
-        
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            print(f"  Warning: seqkit fx2tab returned error code {result.returncode}")
-            return sequences
-        
-        # Parse tab-delimited output: header \t sequence
-        for line in result.stdout.strip().split('\n'):
-            if line:
-                parts = line.split('\t')
-                if len(parts) >= 2:
-                    # Extract just the first word of the header (before any spaces)
-                    header = parts[0].split()[0]
-                    sequence = parts[1]
-                    sequences[header] = sequence
-        
-        return sequences
-        
-    except Exception as e:
-        print(f"Warning: Error reading sequences from {file_path}: {e}")
-        return sequences
-
-
-def find_primer_in_sequence(sequence, primer_seq):
-    """
-    Find positions where primer matches in the sequence using simple string search.
-    Returns list of (position, strand) tuples where position is 0-based.
-    strand is 'fwd' or 'rc' (reverse complement)
-    
-    Note: This does exact matching. For IUPAC ambiguity codes, we rely on
-    seqkit grep to identify which reads contain the primer, then do simple
-    string matching here for position finding.
-    """
-    positions = []
-    seq_upper = sequence.upper()
-    primer_upper = primer_seq.upper()
-    
-    # Search forward strand
-    start = 0
-    while True:
-        pos = seq_upper.find(primer_upper, start)
-        if pos == -1:
-            break
-        positions.append((pos, 'fwd'))
-        start = pos + 1
-    
-    # Search reverse complement
-    primer_rc = reverse_complement(primer_seq).upper()
-    start = 0
-    while True:
-        pos = seq_upper.find(primer_rc, start)
-        if pos == -1:
-            break
-        positions.append((pos, 'rc'))
-        start = pos + 1
-    
-    return positions
-
-
 def find_reads_with_primer(file_path, primer_seq, file_type):
     """
-    Search for primer sequence in a file using seqkit grep.
+    Search for primer sequence in a file using seqkit.
     
-    Returns a dict: {read_header: sequence} for reads containing the primer.
-    seqkit grep -s -d searches both strands and handles IUPAC codes.
+    Returns a list of read headers that contain the primer sequence.
+    
+    The seqkit flags do all the work:
+    -s: search in sequence (not header)
+    -d: treat pattern as degenerate sequence (handles IUPAC codes like N, R, Y, etc.)
+    -p: the pattern to search for
+    
+    seqkit automatically searches BOTH forward and reverse complement strands,
+    so we don't need to manually compute or search reverse complements.
     """
-    matches = {}
-    
     try:
-        # Build seqkit command - use fx2tab to get both header and sequence
+        # Build seqkit command based on file type
         if file_type in ['fasta.gz', 'fastq.gz']:
-            cmd = f"zcat {file_path} | seqkit grep -s -d -p {primer_seq} | seqkit fx2tab"
+            # For gzipped files: decompress first, then search
+            cmd = f"zcat {file_path} | seqkit grep -s -d -p {primer_seq}"
         else:
-            cmd = f"seqkit grep -s -d -p {primer_seq} {file_path} | seqkit fx2tab"
+            # For regular files: search directly
+            cmd = f"seqkit grep -s -d -p {primer_seq} {file_path}"
         
+        # Run the command and capture output
         result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
         
+        # Check for errors (but don't stop - some primers might just not be found)
         if result.returncode != 0:
             print(f"  Warning: seqkit returned error code {result.returncode}")
             if result.stderr:
                 print(f"  Error message: {result.stderr}")
-            return matches
         
-        # Parse tab-delimited output: header \t sequence
-        for line in result.stdout.strip().split('\n'):
-            if line:
-                parts = line.split('\t')
-                if len(parts) >= 2:
-                    header = parts[0].split()[0]
-                    sequence = parts[1]
-                    matches[header] = sequence
+        # Extract read headers from seqkit output
+        # seqkit grep returns the matching reads in FASTA/FASTQ format
+        headers = []
+        for line in result.stdout.split('\n'):
+            # FASTA headers start with >, FASTQ headers start with @
+            if line.startswith('>') or line.startswith('@'):
+                # Remove the > or @ and take first word (header ID)
+                header = line[1:].split()[0]
+                headers.append(header)
         
-        return matches
+        return headers
         
     except Exception as e:
         print(f"Warning: Error searching {file_path}: {e}")
-        return matches
+        return []
 
 
 def process_single_file(primers_file, input_file, output_file):
-    """Process one FASTA/FASTQ file and write results to CSV."""
+    """
+    Process one FASTA/FASTQ file and write results to CSV.
     
-    # Step 1: Load primers
+    For each primer, we use seqkit to find all reads containing that primer,
+    then store the results in a dictionary mapping read headers to the list
+    of primers found in that read.
+    """
+    
+    # Step 1: Load primers from the FASTA file
     primers = parse_fasta(primers_file)
     print(f"Loaded {len(primers)} primers")
     
@@ -229,34 +151,23 @@ def process_single_file(primers_file, input_file, output_file):
     print(f"File type: {file_type}")
     print(f"Processing: {filename}\n")
     
-    # Step 3: Search for each primer and record positions
-    # Store results as: read_header -> [(primer_name, position, strand, read_length)]
+    # Step 3: Search for each primer
+    # Store results as: read_header -> [list of primers found in that read]
     read_primers = defaultdict(list)
     
     for i, (primer_name, primer_seq) in enumerate(primers.items(), 1):
-        primer_rc = reverse_complement(primer_seq)
-        
         print(f"Searching primer {i}/{len(primers)}: {primer_name}")
-        print(f"  Forward:  {primer_seq}")
-        print(f"  Rev Comp: {primer_rc}")
+        print(f"  Sequence: {primer_seq}")
         
-        # Get reads that contain this primer (with sequences)
-        matches = find_reads_with_primer(str(file_path), primer_seq, file_type)
+        # Find all reads containing this primer
+        # seqkit handles IUPAC codes and searches both strands automatically
+        headers = find_reads_with_primer(str(file_path), primer_seq, file_type)
         
-        print(f"  Found in {len(matches)} reads")
+        # Add this primer to each read's list
+        for header in headers:
+            read_primers[header].append(primer_name)
         
-        # For each matching read, find primer position(s)
-        for header, sequence in matches.items():
-            positions = find_primer_in_sequence(sequence, primer_seq)
-            
-            # If positions not found by simple search, just record position as 0
-            # (this can happen with IUPAC codes where exact match won't work)
-            if not positions:
-                # Record as unknown position
-                read_primers[header].append((primer_name, 0, 'unknown', len(sequence)))
-            else:
-                for pos, strand in positions:
-                    read_primers[header].append((primer_name, pos, strand, len(sequence)))
+        print(f"  Found in {len(headers)} reads")
     
     # Step 4: Write results to CSV
     write_results_to_csv(output_file, {filename: read_primers})
@@ -266,7 +177,13 @@ def process_single_file(primers_file, input_file, output_file):
 
 
 def process_directory(primers_file, input_dir, output_file):
-    """Process all FASTA/FASTQ files in a directory and write combined results."""
+    """
+    Process all FASTA/FASTQ files in a directory and write combined results.
+    
+    This is useful when you have multiple samples and want to search them all
+    in one go. The output CSV will include a 'file' column so you can tell
+    which reads came from which file.
+    """
     
     # Step 1: Load primers
     primers = parse_fasta(primers_file)
@@ -291,6 +208,7 @@ def process_directory(primers_file, input_dir, output_file):
     print(f"Found {len(files_to_process)} files to process\n")
     
     # Step 3: Process each file
+    # Store results as: filename -> {read_header -> [primers]}
     all_results = defaultdict(lambda: defaultdict(list))
     
     for file_idx, file_path in enumerate(files_to_process, 1):
@@ -299,18 +217,12 @@ def process_directory(primers_file, input_dir, output_file):
         
         print(f"[{file_idx}/{len(files_to_process)}] Processing: {filename} ({file_type})")
         
-        # Search for each primer
+        # Search for each primer in this file
         for primer_name, primer_seq in primers.items():
-            matches = find_reads_with_primer(str(file_path), primer_seq, file_type)
+            headers = find_reads_with_primer(str(file_path), primer_seq, file_type)
             
-            for header, sequence in matches.items():
-                positions = find_primer_in_sequence(sequence, primer_seq)
-                
-                if not positions:
-                    all_results[filename][header].append((primer_name, 0, 'unknown', len(sequence)))
-                else:
-                    for pos, strand in positions:
-                        all_results[filename][header].append((primer_name, pos, strand, len(sequence)))
+            for header in headers:
+                all_results[filename][header].append(primer_name)
         
         print(f"  Found primers in {len(all_results[filename])} reads\n")
     
@@ -326,30 +238,45 @@ def write_results_to_csv(output_file, results_dict):
     """
     Write search results to CSV file.
     
-    results_dict format: {filename: {read_header: [(primer_name, position, strand, read_length)]}}
+    The output format is designed to be flexible for different numbers of primers
+    per read. Each read gets one row, with columns for each primer found.
+    
+    results_dict format: {filename: {read_header: [list of primers]}}
     """
+    # Figure out the maximum number of primers found in any single read
+    # This tells us how many primer columns we need
+    max_primers = 0
+    for file_results in results_dict.values():
+        for primer_list in file_results.values():
+            max_primers = max(max_primers, len(primer_list))
+    
     with open(output_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
         
         # Write header row
-        header_row = ['file', 'read_header', 'primer', 'position', 'strand', 'read_length']
+        header_row = ['file', 'read_header'] + [f'primer_{i+1}' for i in range(max_primers)]
         writer.writerow(header_row)
         
-        # Write data rows (one per primer match)
+        # Write data rows (one per read that has at least one primer)
         for filename in sorted(results_dict.keys()):
-            for read_header, primer_info_list in sorted(results_dict[filename].items()):
-                for primer_name, position, strand, read_length in primer_info_list:
-                    # Position is 0-based, convert to 1-based for output
-                    # If position is 0 (unknown), keep it as 0 in output
-                    output_pos = position + 1 if position > 0 else 0
-                    row = [filename, read_header, primer_name, output_pos, strand, read_length]
-                    writer.writerow(row)
+            for read_header, primer_list in sorted(results_dict[filename].items()):
+                # Build row: filename, read_header, primer1, primer2, ...
+                row = [filename, read_header] + primer_list
+                # Pad with empty strings if this read has fewer primers than max
+                row += [''] * (len(header_row) - len(row))
+                writer.writerow(row)
 
 
 def main():
+    """
+    Main entry point for the script.
+    
+    Sets up command-line arguments and calls the appropriate processing function
+    based on whether the user provided a single file or a directory.
+    """
     # Set up command-line argument parser
     parser = argparse.ArgumentParser(
-        description='Find primers in FASTA/FASTQ files with position information',
+        description='Find primers in FASTA/FASTQ files (searches both strands, handles IUPAC codes)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -359,16 +286,16 @@ Examples:
   # Process all files in a directory
   python3 primer_search.py -p primers.fa -d /path/to/files/ -o results.csv
 
-Note: This script uses seqkit grep -s -d which searches both forward and reverse
-      complement strands and handles IUPAC ambiguity codes.
-      Positions are reported as 1-based (first base = position 1).
-      Position 0 means the exact position couldn't be determined (IUPAC ambiguity).
+Note: This script uses seqkit grep which automatically searches both forward 
+      and reverse complement strands, and properly handles IUPAC ambiguity codes
+      (N, R, Y, W, S, K, M, B, D, H, V) in primer sequences.
         """
     )
     
     parser.add_argument('-p', '--primers', required=True, 
                         help='FASTA file containing primer sequences')
     
+    # User must specify either -f OR -d, but not both
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('-f', '--file', 
                        help='Single FASTA/FASTQ file to search')
@@ -380,6 +307,7 @@ Note: This script uses seqkit grep -s -d which searches both forward and reverse
     
     args = parser.parse_args()
     
+    # Run the appropriate function based on input type
     if args.file:
         process_single_file(args.primers, args.file, args.output)
     else:
