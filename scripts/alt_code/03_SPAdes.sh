@@ -9,8 +9,8 @@
 # Check if input directory argument is provided
 if [ $# -eq 0 ]; then
     echo "Error: No input directory provided"
-    echo "Usage: sbatch $0 <demuxed_SP27_directory>"
-    echo "Example: sbatch $0 /path/to/demuxed/SP27"
+    echo "Usage: sbatch $0 <demuxed_primerless_directory>"
+    echo "Example: sbatch $0 /path/to/demuxed/primerless"
     exit 1
 fi
 
