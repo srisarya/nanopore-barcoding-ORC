@@ -9,7 +9,6 @@
   * cutadapt v4.9.0: `conda install bioconda::cutadapt`
   * Amplicon Sorter (no releases, separate conda packages to install)
     `conda create -n amplicon_sorter && conda install bioconda::python-edlib biopython matplotlib` 
-  * SPAdes v4.2.0: see [SPAdes docs](https://ablab.github.io/spades/installation.html) for guidance
   * seqkit v2.9.0: `conda install bioconda::seqkit`
   * barrnap v0.9: `conda install bioconda::barrnap`
   * seqtk v1.4-r122: `conda install bioconda::seqtk`
