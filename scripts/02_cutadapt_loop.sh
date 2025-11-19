@@ -106,31 +106,3 @@ while IFS= read -r identifier; do
      
 done < "$identifier_file" && echo "Demultiplexing complete!"
 
-# remove primer sequences from fully demultiplexed reads
-echo "Removing primers from fully demultiplexed reads..."
-while IFS= read -r identifier; do
-    echo "Processing files for identifier: $identifier"
-  
-    # Loop through all demuxed files for this identifier
-    for input_file in "$outdir"/SP27/*_"$identifier"_"$dataset".fastq.gz; do
-        if [ -f "$input_file" ]; then
-            # Extract the full barcode combination from the filename
-            base_name=$(basename "$input_file")
-            # Remove the trailing _identifier_dataset.fastq.gz to get the barcode combo
-            suffix="_${identifier}_${dataset}.fastq.gz"
-            adapter_combo="${base_name%$suffix}"  # Gets "SP27_001_SP5_001" part
-          
-            echo "  Processing: $base_name"
-          
-            cutadapt \
-             --action=trim \
-             -e "$e_rate" -j 24 --rc \
-             -g file:"$primers_fwd" \
-             -a file:"$primers_rvs" \
-             -o "$outdir"/primerless/clean_"$adapter_combo"_"$identifier"_"$dataset".fastq.gz \
-             "$input_file" \
-             --json="$outdir"/primerless/"$adapter_combo"_"$identifier"_"$dataset".json
-        fi
-    done
-     
-done < "$identifier_file"
