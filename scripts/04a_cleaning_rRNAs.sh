@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=trim_consensus_array
+#SBATCH --job-name=trim_consensus_rRNA_paired
 #SBATCH --mem=2G
 #SBATCH --cpus-per-task=4
 #SBATCH --time=12:00:00
@@ -20,13 +20,7 @@ fi
 
 amplicon_sorted_dir="$1"
 
-# Primer files
-primers_fwd=nanopore-barcoding-ORC/adapters_hmms/amplicon_primers_forward.fa
-primers_rvs=nanopore-barcoding-ORC/adapters_hmms/amplicon_primers_reverse.fa
-e_rate="0.1"
-
 echo "Amplicon sorted directory: $amplicon_sorted_dir"
-echo ""
 
 # Get *_consensus_rRNAs.fasta for this array index
 consensus_file=$(find "$amplicon_sorted_dir" -type f -name "*_consensus_rRNAs.fasta" -path "*/rRNAs/*" | sort | sed -n "${SLURM_ARRAY_TASK_ID}p")
@@ -54,20 +48,16 @@ echo "Output directory: $output_dir"
 echo ""
 
 output_fasta="${output_dir}/primerless_rRNAs_${identifier}.fasta"
-output_json="${output_dir}/primerless_rRNAs_${identifier}.json"
 
 # Run cutadapt
 source activate cutadapt
 
 cutadapt \
- --action=trim \
- -e "$e_rate" \
  -j "$SLURM_CPUS_PER_TASK" \
- -g file:"$primers_fwd" \
- -a file:"$primers_rvs" \
+ -g "GCTTGTCTCAAAGATTAAGCC...ACCCGCTGAAYTTAAGCATAT" \
+ -g "TTTTGGTAAGCAGAACTGGYG...CTGAACGCCTCTAAGKYRGWA" \
  -o "$output_fasta" \
- "$consensus_file" \
- --json="$output_json"
+ "$consensus_file"
 
 echo "--- Primer trimming completed ---"
 echo "Output saved to: $output_fasta"
