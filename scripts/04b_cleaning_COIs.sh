@@ -47,7 +47,8 @@ mkdir -p "$output_dir"
 echo "Output directory: $output_dir"
 echo ""
 
-output_fasta="${output_dir}/primerless_COIs_${identifier}.fasta"
+primerless_fasta="${output_dir}/primerless_COIs_${identifier}.fasta"
+output_fasta="${output_dir}/nr_COIs_${identifier}.fasta"
 
 # Run cutadapt
 source activate cutadapt
@@ -56,8 +57,19 @@ cutadapt \
  -j "$SLURM_CPUS_PER_TASK" \
  -g "TNTCNACNAAYCAYAARGAYATTGG...TGRTTYTTYGGNCAYCCNGNRGTNTA" \
  -g "GGDRCWGGWTGAACWGTWTAYCCNCC...TGRTTYTTYGGNCAYCCNGNRGTNTA" \
- -o "$output_fasta" \
+ -o "$primerless_fasta" \
  "$consensus_file"
 
 echo "--- Primer trimming completed ---"
+
+# cluster hits
+conda deactivate && source activate cd-hit
+
+cd-hit-est \
+ -i "$primerless_fasta" \
+ -o "$output_fasta" \
+ -T "$SLURM_CPUS_PER_TASK"
+
+echo "--- Clustering completed ---"
 echo "Output saved to: $output_fasta"
+echo "Cluster info saved to: ${output_fasta}.clstr"
