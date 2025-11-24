@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=trim_consensus_rRNA_paired
+#SBATCH --job-name=trim_consensus_COI
 #SBATCH --mem=2G
 #SBATCH --cpus-per-task=4
 #SBATCH --time=12:00:00
@@ -39,37 +39,89 @@ identifier=$(basename "$sample_dir")
 
 echo "Sample identifier: $identifier"
 
+workdir=$(dirname "$amplicon_sorted_dir")
 
-workdir=$(dirname "$amplicon_sorted_dir") 
-output_dir="${workdir}/primerless/${identifier}"
-mkdir -p "$output_dir"
+# Create subdirectories for round 1 and round 2
+output_dir_round1="${workdir}/primerless/${identifier}/COIs/COIs_300_900bp"
+output_dir_round2="${workdir}/primerless/${identifier}/rRNAs/rRNA_300_900bp"
+mkdir -p "$output_dir_round1"
+mkdir -p "$output_dir_round2"
 
-echo "Output directory: $output_dir"
+echo "Round 1 output directory: $output_dir_round1"
+echo "Round 2 output directory: $output_dir_round2"
 echo ""
 
-primerless_fasta="${output_dir}/primerless_COIs_${identifier}.fasta"
-output_fasta="${output_dir}/nr_COIs_${identifier}.fasta"
+# Output files
+primerless_fasta_round1="${output_dir_round1}/primerless_COIs_${identifier}.fasta"
+untrimmed_fasta_round1="${output_dir_round1}/untrimmed_COIs_${identifier}.fasta"
+output_fasta_round1="${output_dir_round1}/nr_COIs_${identifier}.fasta"
+
+primerless_fasta_round2="${output_dir_round2}/recategorised_rRNAs_${identifier}.fasta"
+output_fasta_round2="${output_dir_round2}/nr_rRNAs_${identifier}.fasta"
 
 # Run cutadapt
 source activate cutadapt
 
+# Round 1: trim COI primers
+echo "--- Round 1: Trimming COI primers ---"
 cutadapt \
  -j "$SLURM_CPUS_PER_TASK" \
  -g "TNTCNACNAAYCAYAARGAYATTGG...TGRTTYTTYGGNCAYCCNGNRGTNTA" \
  -g "GGDRCWGGWTGAACWGTWTAYCCNCC...TGRTTYTTYGGNCAYCCNGNRGTNTA" \
- -o "$primerless_fasta" \
+ --untrimmed-output="$untrimmed_fasta_round1" \
+ -o "$primerless_fasta_round1" \
  "$consensus_file"
 
-echo "--- Primer trimming completed ---"
+echo "Round 1 completed. Trimmed sequences: $primerless_fasta_round1"
+echo "Round 1 untrimmed sequences: $untrimmed_fasta_round1"
+echo ""
 
-# cluster hits
+# Round 2: test untrimmed sequences for rRNA primers and recategorise if found
+echo "--- Round 2: Testing untrimmed sequences for rRNA primers ---"
+cutadapt \
+ -j "$SLURM_CPUS_PER_TASK" \
+ -g "GCTTGTCTCAAAGATTAAGCC...ACCCGCTGAAYTTAAGCATAT" \
+ -g "TTTTGGTAAGCAGAACTGGYG...CTGAACGCCTCTAAGKYRGWA" \
+ --discard-untrimmed \
+ -o "$primerless_fasta_round2" \
+ "$untrimmed_fasta_round1"
+
+echo "Round 2 completed. Recategorised sequences: $primerless_fasta_round2"
+echo ""
+
+# Cluster hits for both rounds
 conda deactivate && source activate cd-hit
 
-cd-hit-est \
- -i "$primerless_fasta" \
- -o "$output_fasta" \
- -T "$SLURM_CPUS_PER_TASK"
+# Cluster round 1 COIs
+if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
+    echo "--- Clustering Round 1 COIs ---"
+    cd-hit-est \
+     -i "$primerless_fasta_round1" \
+     -o "$output_fasta_round1" \
+     -T "$SLURM_CPUS_PER_TASK"
+    echo "Round 1 clustering completed: $output_fasta_round1"
+    echo "Round 1 cluster info: ${output_fasta_round1}.clstr"
+else
+    echo "No sequences in Round 1 to cluster"
+fi
 
-echo "--- Clustering completed ---"
-echo "Output saved to: $output_fasta"
-echo "Cluster info saved to: ${output_fasta}.clstr"
+# Cluster round 2 recategorised rRNAs
+if [ -f "$primerless_fasta_round2" ] && [ -s "$primerless_fasta_round2" ]; then
+    echo "--- Clustering Round 2 recategorised rRNAs ---"
+    cd-hit-est \
+     -i "$primerless_fasta_round2" \
+     -o "$output_fasta_round2" \
+     -T "$SLURM_CPUS_PER_TASK"
+    echo "Round 2 clustering completed: $output_fasta_round2"
+    echo "Round 2 cluster info: ${output_fasta_round2}.clstr"
+else
+    echo "No sequences in Round 2 to cluster"
+fi
+
+echo ""
+echo "--- All processing completed ---"
+echo "Final outputs:"
+echo "  Round 1 COIs: $output_fasta_round1"
+echo "  Round 2 rRNAs: $output_fasta_round2"
+echo ""
+echo "--- Job completed at: $(date '+%Y-%m-%d %H:%M:%S') ---"

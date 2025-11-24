@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=trim_consensus_rRNA_paired
+#SBATCH --job-name=trim_consensus_rRNA
 #SBATCH --mem=2G
 #SBATCH --cpus-per-task=4
 #SBATCH --time=12:00:00
@@ -39,25 +39,52 @@ identifier=$(basename "$sample_dir")
 
 echo "Sample identifier: $identifier"
 
-
 workdir=$(dirname "$amplicon_sorted_dir") 
-output_dir="${workdir}/primerless/${identifier}"
-mkdir -p "$output_dir"
 
-echo "Output directory: $output_dir"
+# Create subdirectories for round 1 and round 2
+output_dir_r1="${workdir}/primerless/${identifier}/rRNAs/round1"
+output_dir_r2="${workdir}/primerless/${identifier}/COIs/round2"
+mkdir -p "$output_dir_r1"
+mkdir -p "$output_dir_r2"
+
+echo "Round 1 output directory: $output_dir_r1"
+echo "Round 2 output directory: $output_dir_r2"
 echo ""
 
-output_fasta="${output_dir}/primerless_rRNAs_${identifier}.fasta"
+# Output files
+output_fasta_r1="${output_dir_r1}/primerless_rRNAs_${identifier}.fasta"
+untrimmed_fasta_r1="${output_dir_r1}/untrimmed_rRNAs_${identifier}.fasta"
+output_fasta_r2="${output_dir_r2}/recategorised_COIs_${identifier}.fasta"
 
 # Run cutadapt
 source activate cutadapt
 
+# Round 1: trim rRNA primers and put untrimmed sequences into a separate file
+echo "--- Round 1: Trimming rRNA primers ---"
 cutadapt \
  -j "$SLURM_CPUS_PER_TASK" \
  -g "GCTTGTCTCAAAGATTAAGCC...ACCCGCTGAAYTTAAGCATAT" \
  -g "TTTTGGTAAGCAGAACTGGYG...CTGAACGCCTCTAAGKYRGWA" \
- -o "$output_fasta" \
+ --untrimmed-output="$untrimmed_fasta_r1" \
+ -o "$output_fasta_r1" \
  "$consensus_file"
 
+echo "Round 1 completed. Trimmed sequences: $output_fasta_r1"
+echo "Round 1 untrimmed sequences: $untrimmed_fasta_r1"
+echo ""
+
+# Round 2: test untrimmed sequences for COI primers and recategorise if found
+echo "--- Round 2: Testing untrimmed sequences for COI primers ---"
+cutadapt \
+ -j "$SLURM_CPUS_PER_TASK" \
+ -g "TNTCNACNAAYCAYAARGAYATTGG...TGRTTYTTYGGNCAYCCNGNRGTNTA" \
+ -g "GGDRCWGGWTGAACWGTWTAYCCNCC...TGRTTYTTYGGNCAYCCNGNRGTNTA" \
+ --discard-untrimmed \
+ -o "$output_fasta_r2" \
+ "$untrimmed_fasta_r1"
+
 echo "--- Primer trimming completed ---"
-echo "Output saved to: $output_fasta"
+echo "Round 1 (rRNA) output: $output_fasta_r1"
+echo "Round 2 (recategorised COI) output: $output_fasta_r2"
+echo ""
+echo "--- Job completed at: $(date '+%Y-%m-%d %H:%M:%S') ---"
