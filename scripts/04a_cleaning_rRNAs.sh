@@ -42,19 +42,19 @@ echo "Sample identifier: $identifier"
 workdir=$(dirname "$amplicon_sorted_dir") 
 
 # Create subdirectories for round 1 and round 2
-output_dir_r1="${workdir}/primerless/${identifier}/rRNAs/round1"
-output_dir_r2="${workdir}/primerless/${identifier}/COIs/round2"
-mkdir -p "$output_dir_r1"
-mkdir -p "$output_dir_r2"
+output_dir_round1="${workdir}/primerless/${identifier}/rRNAs/rRNAs_3kbplus"
+output_dir_round2="${workdir}/primerless/${identifier}/rRNAs/COIs_3kbplus"
+mkdir -p "$output_dir_round1"
+mkdir -p "$output_dir_round2"
 
-echo "Round 1 output directory: $output_dir_r1"
-echo "Round 2 output directory: $output_dir_r2"
+echo "Round 1 output directory: $output_dir_round1"
+echo "Round 2 output directory: $output_dir_round2"
 echo ""
 
 # Output files
-output_fasta_r1="${output_dir_r1}/primerless_rRNAs_${identifier}.fasta"
-untrimmed_fasta_r1="${output_dir_r1}/untrimmed_rRNAs_${identifier}.fasta"
-output_fasta_r2="${output_dir_r2}/recategorised_COIs_${identifier}.fasta"
+primerless_fasta_round1="${output_dir_round1}/primerless_rRNAs_${identifier}.fasta" # the correct output
+untrimmed_fasta_round1="${output_dir_round1}/untrimmed_rRNAs_${identifier}.fasta" # the sequences that didn't match COI primers
+primerless_fasta_round2="${output_dir_round2}/COI_ish_${identifier}.fasta" # the sequences that matched rRNA primers
 
 # Run cutadapt
 source activate cutadapt
@@ -65,26 +65,31 @@ cutadapt \
  -j "$SLURM_CPUS_PER_TASK" \
  -g "GCTTGTCTCAAAGATTAAGCC...ACCCGCTGAAYTTAAGCATAT" \
  -g "TTTTGGTAAGCAGAACTGGYG...CTGAACGCCTCTAAGKYRGWA" \
- --untrimmed-output="$untrimmed_fasta_r1" \
- -o "$output_fasta_r1" \
+ --untrimmed-output="$untrimmed_fasta_round1" \
+ -o "$primerless_fasta_round1" \
  "$consensus_file"
 
-echo "Round 1 completed. Trimmed sequences: $output_fasta_r1"
-echo "Round 1 untrimmed sequences: $untrimmed_fasta_r1"
+echo "Round 1 completed. Trimmed sequences: $primerless_fasta_round1"
+echo "Round 1 untrimmed sequences: $untrimmed_fasta_round1"
 echo ""
 
 # Round 2: test untrimmed sequences for COI primers and recategorise if found
 echo "--- Round 2: Testing untrimmed sequences for COI primers ---"
 cutadapt \
  -j "$SLURM_CPUS_PER_TASK" \
- -g "TNTCNACNAAYCAYAARGAYATTGG...TGRTTYTTYGGNCAYCCNGNRGTNTA" \
- -g "GGDRCWGGWTGAACWGTWTAYCCNCC...TGRTTYTTYGGNCAYCCNGNRGTNTA" \
+ -e 0.4 \
+ -g "TNTCNACNAAYCAYAARGAYATTGG" \
+ -a "TGRTTYTTYGGNCAYCCNGNRGTNTA" \
+ -g "GGDRCWGGWTGAACWGTWTAYCCNCC" \
+ -a "TGRTTYTTYGGNCAYCCNGNRGTNTA" \
  --discard-untrimmed \
- -o "$output_fasta_r2" \
- "$untrimmed_fasta_r1"
+ -o "$primerless_fasta_round2" \
+ "$untrimmed_fasta_round1"
 
-echo "--- Primer trimming completed ---"
-echo "Round 1 (rRNA) output: $output_fasta_r1"
-echo "Round 2 (recategorised COI) output: $output_fasta_r2"
 echo ""
+echo "--- All processing completed ---"
+echo "Final outputs:"
+echo "  Round 1 primer trimming rRNAs: $primerless_fasta_round1"
+echo "  Round 2 primer trimming COIs: $primerless_fasta_round2"
+echo ""*
 echo "--- Job completed at: $(date '+%Y-%m-%d %H:%M:%S') ---"
