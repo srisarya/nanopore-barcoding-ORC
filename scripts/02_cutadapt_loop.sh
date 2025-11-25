@@ -115,7 +115,7 @@ removed_invalid=$(find "$outdir" -type f \( \
     -name "*SP27_009*" -o \
     -name "*SP27_010*" -o \
     -name "*SP27_011*" -o \
-    -name "*SP27_012*" \) -delete -print | wc -l)
+    -name "*SP27_012*" \) -print -delete | wc -l)
 echo "Removed $removed_invalid files with invalid SP27 indices"
 
 echo "Pipeline complete!"
