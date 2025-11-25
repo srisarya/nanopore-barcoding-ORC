@@ -2,17 +2,17 @@
 ## *This is the code used to process COI/28S/18S amplicon data from the 2025 NERC/NHM Lake District Freshwater Meiofauna workshop*
 
 ## Installation and setup
-* You'll need this software:
-  * pychopper v2.7.0 : `mamba create -n pychopper bioconda::pychopper`
-  * cutadapt v4.9.0: `mamba create -n cutadapt bioconda::cutadapt`
+* You'll need this software, pelase make separate conda envs for each:
+  * pychopper v2.7.0 : `conda create -n pychopper bioconda::pychopper`
+  * cutadapt v4.9.0: `conda create -n cutadapt bioconda::cutadapt`
   * Amplicon Sorter (no releases, separate conda packages to install)
     `conda create -n amplicon_sorter && conda install bioconda::python-edlib biopython matplotlib` 
-  * seqkit v2.9.0: `mamba create -n seqkit bioconda::seqkit`
-  * cd-hit v4.8.1: `mamba create -n cd-hit bioconda::cd-hit`
-  * barrnap v0.9: `mamba create -n barrnap bioconda::barrnap`
-  * seqtk v1.4-r122: `mamba create -n seqtk bioconda::seqtk`
-  * hmmer v3.1b2: `mamba create -n hmmer bioconda::hmmer`
-  * bedtools v2.31.1: `mamba create -n bedtools bioconda::bedtools`
+  * seqkit v2.9.0: `conda create -n seqkit bioconda::seqkit`
+  * cd-hit v4.8.1: `conda create -n cd-hit bioconda::cd-hit`
+  * barrnap v0.9: `conda create -n barrnap bioconda::barrnap`
+  * seqtk v1.4-r122: `conda create -n seqtk bioconda::seqtk`
+  * hmmer v3.1b2: `conda create -n hmmer bioconda::hmmer`
+  * bedtools v2.31.1: `conda create -n bedtools bioconda::bedtools`
 
 ## How to structure
 - Run the scripts in the parent directory to the cloned github repo (so the filepaths remain relative)
