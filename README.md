@@ -20,7 +20,7 @@
 - To run this code, git clone this whole repo, keeping the adapter directory and the scripts directory in the relative places they're in so that the codes run smoothly (or, edit the code yourself only in your cloned remote repo!
 
 ## The workflow
-![bioinformatic workflow for processing DNA barcoding, from raw data to reorienting, demuxing, consensus building, cleaning, getting gene sequences, and selecting the best hits](<new strategy DNA Barcoding.png>)
+![bioinformatic workflow for processing DNA barcoding, from raw data to reorienting, demuxing, consensus building, cleaning, getting gene sequences, and selecting the best hits](schematics/new_strategy_DNA_Barcoding.png)
 
   1. `01_pychopper.sh`: This script reorients and quality-score trims cDNA reads into the same orientation
      * This script takes in 2 extra files, which are hardcoded into the script:
@@ -50,8 +50,8 @@
 
 ## Primer schematics
 ### rRNA amplification
-![schematic for amplification of 18S/5.8S/partial 28S rRNA cistron, showing wiggly purple line representing DNA, yelllow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](18S-58S_28Spartial.png)
-![schematic for amplification of full 28S rRNA gene, showing wiggly purple line representing DNA, yelllow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](28S_full.png)
+![schematic for amplification of 18S/5.8S/partial 28S rRNA cistron, showing wiggly purple line representing DNA, yelllow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](schematics/18S-58S_28Spartial.png)
+![schematic for amplification of full 28S rRNA gene, showing wiggly purple line representing DNA, yelllow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](schematics/28S_full.png)
 
 ### COI amplification
-![schematic for amplification of partial COI gene, showing wiggly purple line representing DNA, yelllow boxes where COI gene is (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify COI, not to scale](COI.png)
+![schematic for amplification of partial COI gene, showing wiggly purple line representing DNA, yelllow boxes where COI gene is (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify COI, not to scale](schematics/COI.png)
