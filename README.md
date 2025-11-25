@@ -32,11 +32,12 @@
        * You may notice that we do bin reads into adapter combinations which do not exist! Though this is inefficient, it's not the end of the world, since we have sequenced deeply enough per individual that enough reads are binned into the correct adapter combinations
        * These non-existing adapter combos are removed after demuxing, along with the 'unknown' bins, since we don't want to analyse them later on. 
   
-  3. `03a_Amplicon_sorter_rRNAs.sh` and/or `03b_Amplicon_sorter_COIs.sh`
-     * The workflow branches here, to either cluster all the rRNA reads together, before using a HMM to extract exact genes, OR to cluster all COI fragments together. In the wet-lab protocol:
-      * For the rRNAs, we use 2 sets of primers to amplify overlapping segments of the nuclear rRNA cistron 
-      * For the COIs, we use 2 alternate options for a forward primer, and one option for a reverse primer, to amplify 'redundant' sequences of a COI barcode segment (the 2 alternate options for the forward primer allow for matching more taxa than just one)
+  3. `03_amplicon_sorter.sh`
+     * The workflow is more dynamic here, since the user may be analysing different amplicons to us. In _our_ wet-lab protocol:
+      * For the rRNAs, we use 2 sets of primers to amplify overlapping segments of the nuclear rRNA cistron, so a sequence can be anywhere over 3Kb in length
+      * For the COIs, we use 2 alternate options for a forward primer, and one option for a reverse primer, to amplify 'redundant' sequences of a COI barcode segment (the 2 alternate options for the forward primer allow for matching more taxa than just one), so a sequence can be between 300bp-900bp in length
      * The amplicon sorter step splits samples' reads by size and clusters them by sequence
+     * The variables (min length, max length, prefix name for amplicon type, and input folder) are user defined :)
   
   4. `04a_cleaning_rRNAs.sh` and/or `04b_cleaning_COIs.sh`
        * This script takes each clustered (amplicon-sorted) file and removes the primer sequences from the amplicon sequences, since these are synthetic
