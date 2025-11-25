@@ -3,16 +3,16 @@
 
 ## Installation and setup
 * You'll need this software:
-  * pychopper v2.7.0 : `conda install bioconda::pychopper`
-  * cutadapt v4.9.0: `conda install bioconda::cutadapt`
+  * pychopper v2.7.0 : `mamba create -n pychopper bioconda::pychopper`
+  * cutadapt v4.9.0: `mamba create -n cutadapt bioconda::cutadapt`
   * Amplicon Sorter (no releases, separate conda packages to install)
     `conda create -n amplicon_sorter && conda install bioconda::python-edlib biopython matplotlib` 
-  * seqkit v2.9.0: `conda install bioconda::seqkit`
-  * cd-hit v4.8.1: `conda install bioconda::cd-hit`
-  * barrnap v0.9: `conda install bioconda::barrnap`
-  * seqtk v1.4-r122: `conda install bioconda::seqtk`
-  * hmmer v3.1b2: `conda install bioconda::hmmer`
-  * bedtools v2.31.1: `conda install bioconda::bedtools`
+  * seqkit v2.9.0: `mamba create -n seqkit bioconda::seqkit`
+  * cd-hit v4.8.1: `mamba create -n cd-hit bioconda::cd-hit`
+  * barrnap v0.9: `mamba create -n barrnap bioconda::barrnap`
+  * seqtk v1.4-r122: `mamba create -n seqtk bioconda::seqtk`
+  * hmmer v3.1b2: `mamba create -n hmmer bioconda::hmmer`
+  * bedtools v2.31.1: `mamba create -n bedtools bioconda::bedtools`
 
 ## How to structure
 - Run the scripts in the parent directory to the cloned github repo (so the filepaths remain relative)
