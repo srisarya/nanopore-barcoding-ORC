@@ -30,6 +30,7 @@
   2. `02_cutadapt_loop.sh`: This script is a loop which first demultiplexes the reads based on the 5' SP5 primers, and then one-by-one, demultiplexes each output from the SP5 demultiplexing by the SP27 3' primers. It also trims adapters on-the-fly.
        * This script takes in 2 extra files, which are hardcoded into the script: the 5' and 3' adapter sequences, `M13_amplicon_indices_forward.fa` and the reverse complement of the 3' sequences (since we reoriented before with pychopper, `M13_amplicon_indices_reverse_rc.fa`)
        * You may notice that we do bin reads into adapter combinations which do not exist! Though this is inefficient, it's not the end of the world, since we have sequenced deeply enough per individual that enough reads are binned into the correct adapter combinations
+       * These non-existing adapter combos are removed after demuxing, along with the 'unknown' bins, since we don't want to analyse them later on. 
   
   3. `03a_Amplicon_sorter_rRNAs.sh` and/or `03b_Amplicon_sorter_COIs.sh`
      * The workflow branches here, to either cluster all the rRNA reads together, before using a HMM to extract exact genes, OR to cluster all COI fragments together. In the wet-lab protocol:
