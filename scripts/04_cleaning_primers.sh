@@ -9,15 +9,15 @@
 # Usage information
 usage() {
     cat << EOF
-Usage: sbatch --array=1-N $0 <amplicon_sorted_dir> <amplicon_type> --r1-primers <file> [options]
+Usage: sbatch $0 <amplicon_sorted_dir> <amplicon_type> --r1-primers <file> [options]
 
 Required arguments:
   <amplicon_sorted_dir>    Base directory containing sample subdirectories (e.g., Lakes_day1/amplicon_sorted)
   <amplicon_type>          Amplicon type to process (e.g., rRNAs, COIs)
-  --r1-primers <file>      FASTA file with Round 1 primers (linked pairs)
+  --r1-primers <file>      FASTA file with Round 1 primers (linked pairs, degenerate bases permitted)
 
 Optional arguments:
-  --r2-primers <file>      FASTA file with Round 2 primers (unlinked)
+  --r2-primers <file>      FASTA file with Round 2 primers (unlinked, degenerate bases permitted)
   --skip-round2            Skip Round 2 trimming entirely
   --cluster-round1         Cluster Round 1 output sequences with cd-hit-est
 
@@ -32,25 +32,19 @@ Primer FASTA format:
 
 Examples:
   Round 1 primers (COI_primers_r1.fasta):
-    >jgLCO1490|Moorea_Forward_A
-    TNTCNACNAAYCAYAARGAYATTGG
-    >jgHCO2198|Moorea_Reverse_A
-    TANACYNCNGGRTGNCCRAARAAYCA
-    >COI-Sauron|Sauron_Forward_B
-    GGDRCWGGWTGAACWGTWTAYCCNCC
-    >jgHCO2198|Sauron_Reverse_B
-    TANACYNCNGGRTGNCCRAARAAYCA
-
-  Round 2 primers (COI_primers_r2.fasta):
-    >ExtraPrimer1|Extra_Forward
-    ACGTACGTACGT
-    >ExtraPrimer2|Extra_Reverse
-    TGCATGCATGCA
+    >[name]|Forward_A
+    TGAYATTGG
+    >[name]|Reverse_A
+    TANARYNCA
+    >[name]|Forward_B
+    WTAYCCNCC
+    >[name]|Reverse_B
+    TANARAAYCA
 
 Usage:
-  sbatch --array=1-10 $0 Lakes_day1/amplicon_sorted COIs --r1-primers COI_primers_r1.fasta --r2-primers COI_primers_r2.fasta --cluster-round1
+  sbatch $0 Lakes_day1/amplicon_sorted COIs --r1-primers primers_r1.fasta --r2-primers primers_r2.fasta --cluster-round1 
 
-Note: This script can take into account degenerate bases in primers. The primers MUST BE IN THE CORRECT ORIENTATION (5' to 3'), so check that you've correctly oriented them (might need to reverse complement the 3' primer hehe).
+Note: The primers MUST BE IN THE CORRECT ORIENTATION (5' to 3'), so check that you've correctly oriented them (might need to reverse complement the 3' primer hehe).
 EOF
     exit 1
 }
