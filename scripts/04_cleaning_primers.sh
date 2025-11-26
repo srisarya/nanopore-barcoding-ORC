@@ -18,7 +18,7 @@ Required arguments:
 
 Optional arguments:
   --r2-primers <file>      FASTA file with Round 2 primers (unlinked, degenerate bases permitted)
-  --skip-round2            Skip Round 2 trimming entirely
+  --run-round2             Run Round 2 trimming on untrimmed sequences (default: skip Round 2)
   --cluster-round1         Cluster Round 1 output sequences with cd-hit-est
 
 Primer FASTA format:
@@ -42,7 +42,11 @@ Examples:
     TANARAAYCA
 
 Usage:
-  sbatch $0 Lakes_day1/amplicon_sorted COIs --r1-primers primers_r1.fasta --r2-primers primers_r2.fasta --cluster-round1 
+  # Default (skip Round 2, discard untrimmed sequences):
+  sbatch $0 Lakes_day1/amplicon_sorted COIs --r1-primers primers_r1.fasta --cluster-round1
+  
+  # With Round 2 trimming:
+  sbatch $0 Lakes_day1/amplicon_sorted COIs --r1-primers primers_r1.fasta --r2-primers primers_r2.fasta --run-round2
 
 Note: The primers MUST BE IN THE CORRECT ORIENTATION (5' to 3'), so check that you've correctly oriented them (might need to reverse complement the 3' primer hehe).
 EOF
@@ -54,7 +58,7 @@ amplicon_sorted_dir=""
 amplicon_type=""
 r1_primers_file=""
 r2_primers_file=""
-skip_round2=false
+run_round2=false
 cluster_round1=false
 
 # Parse arguments
@@ -74,11 +78,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --r2-primers)
             r2_primers_file="$2"
-            skip_round2=false
             shift 2
             ;;
-        --skip-round2)
-            skip_round2=true
+        --run-round2)
+            run_round2=true
             shift
             ;;
         --cluster-round1)
@@ -173,6 +176,11 @@ clustered_fasta_round1="${output_dir}/clustered_clean_amplicon_${identifier}.fas
 untrimmed_fasta_round1="${output_dir}/untrimmed_round1_${identifier}.fasta"
 primerless_fasta_round2="${output_dir}/wrong_primers_${identifier}.fasta"
 
+# Define temporary files
+temp_primers="${output_dir}/temp_primers_${identifier}.fa"
+temp_primer_locations="${output_dir}/primer_locations_${identifier}.txt"
+temp_sequences_with_primers="${output_dir}/sequences_with_primers_${identifier}.txt"
+
 #----------------------------------------#
 # Parse Round 1 primers and build pairs
 
@@ -264,15 +272,16 @@ fi
 #----------------------------------------#
 # Parse Round 2 primers if provided
 
-echo "--- Parsing Round 2 primers from $r2_primers_file ---"
-
 declare -A r2_forward_primers
 declare -A r2_reverse_primers
 declare -a r2_pair_ids
 
-current_header=""
-current_seq=""
-if [ -n "$r2_primers_file" ] && [ "$skip_round2" = false ]; then
+if [ "$run_round2" = true ] && [ -n "$r2_primers_file" ]; then
+    echo "--- Parsing Round 2 primers from $r2_primers_file ---"
+    
+    current_header=""
+    current_seq=""
+    
     while IFS= read -r line; do
         # Skip empty lines
         if [ -z "$line" ]; then
@@ -292,7 +301,7 @@ if [ -n "$r2_primers_file" ] && [ "$skip_round2" = false ]; then
                     # Store forward primer for each pair ID found
                     for pair_id in "${pair_ids_in_header[@]}"; do
                         r2_forward_primers[$pair_id]="$current_seq"
-                        echo "  Round 1 Forward (pair $pair_id): $current_seq"
+                        echo "  Round 2 Forward (pair $pair_id): $current_seq"
                         
                         # Track unique pair IDs
                         if [[ ! " ${r2_pair_ids[@]} " =~ " ${pair_id} " ]]; then
@@ -303,7 +312,7 @@ if [ -n "$r2_primers_file" ] && [ "$skip_round2" = false ]; then
                     # Store reverse primer for each pair ID found
                     for pair_id in "${pair_ids_in_header[@]}"; do
                         r2_reverse_primers[$pair_id]="$current_seq"
-                        echo "  Round 1 Reverse (pair $pair_id): $current_seq"
+                        echo "  Round 2 Reverse (pair $pair_id): $current_seq"
                         
                         # Track unique pair IDs
                         if [[ ! " ${r2_pair_ids[@]} " =~ " ${pair_id} " ]]; then
@@ -331,7 +340,7 @@ if [ -n "$r2_primers_file" ] && [ "$skip_round2" = false ]; then
         if [[ $current_header == *"Forward"* ]]; then
             for pair_id in "${pair_ids_in_header[@]}"; do
                 r2_forward_primers[$pair_id]="$current_seq"
-                echo "  Round 1 Forward (pair $pair_id): $current_seq"
+                echo "  Round 2 Forward (pair $pair_id): $current_seq"
                 
                 if [[ ! " ${r2_pair_ids[@]} " =~ " ${pair_id} " ]]; then
                     r2_pair_ids+=("$pair_id")
@@ -340,7 +349,7 @@ if [ -n "$r2_primers_file" ] && [ "$skip_round2" = false ]; then
         elif [[ $current_header == *"Reverse"* ]]; then
             for pair_id in "${pair_ids_in_header[@]}"; do
                 r2_reverse_primers[$pair_id]="$current_seq"
-                echo "  Round 1 Reverse (pair $pair_id): $current_seq"
+                echo "  Round 2 Reverse (pair $pair_id): $current_seq"
                 
                 if [[ ! " ${r2_pair_ids[@]} " =~ " ${pair_id} " ]]; then
                     r2_pair_ids+=("$pair_id")
@@ -393,9 +402,6 @@ if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
     # Switch to seqkit environment
     conda deactivate && source activate seqkit
     
-    # Create temporary primer file by concatenating input files
-    temp_primers="${output_dir}/temp_primers_${identifier}.fa"
-    
     # Concatenate Round 1 primers
     cat "$r1_primers_file" > "$temp_primers"
     
@@ -408,11 +414,10 @@ if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
     echo "Checking for $primer_count primers..."
     
     # Use seqkit locate to find sequences with primers
-    # -d for degenerate bases, --pattern-file for primer file
-    seqkit locate -d --pattern-file "$temp_primers" "$primerless_fasta_round1" > "${output_dir}/primer_locations_${identifier}.txt" 2>/dev/null
+    seqkit locate -d --pattern-file "$temp_primers" "$primerless_fasta_round1" > "$temp_primer_locations" 2>/dev/null
     
     # Extract unique sequence IDs that have primer hits (skip header line)
-    sequences_with_primers=$(tail -n +2 "${output_dir}/primer_locations_${identifier}.txt" | cut -f1 | uniq)
+    sequences_with_primers=$(tail -n +2 "$temp_primer_locations" | cut -f1 | uniq)
     
     if [ -n "$sequences_with_primers" ]; then
         seq_count=$(echo "$sequences_with_primers" | wc -l)
@@ -421,20 +426,34 @@ if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
         echo "Sequences with primers:"
         echo "$sequences_with_primers"
         echo "These sequences still contain primer sequences after Round 1 trimming."
+        
         # Extract unique sequence IDs that have primer hits (skip header line)
-        cut -f1 "${output_dir}/primer_locations_${identifier}.txt" | sort -u > "${output_dir}/sequences_with_primers_${identifier}.txt"
-        # Now use that file to exclude sequences
-        seqkit grep -v -f "${output_dir}/sequences_with_primers_${identifier}.txt" "$primerless_fasta_round1" > "$cleanest_fasta_round1"
-        removed_count=$(wc -l < "${output_dir}/sequences_with_primers_${identifier}.txt" | tr -d '[:space:]')
+        cut -f1 "$temp_primer_locations" | sort -u > "$temp_sequences_with_primers"
+        
+        # Use that file to exclude sequences
+        seqkit grep -v -f "$temp_sequences_with_primers" "$primerless_fasta_round1" > "$cleanest_fasta_round1"
+        
+        removed_count=$(wc -l < "$temp_sequences_with_primers" | tr -d '[:space:]')
         echo "Failsafe FAILED. Residual primers detected, removed ${removed_count} sequences."
+        
+        # Clean up temp files
+        rm -f "$temp_primers" "$temp_primer_locations" "$temp_sequences_with_primers"
+        
         exit 0
     else
-        echo "Failsafe passed. No residual primers detected in Round 1 output."  
+        echo "Failsafe passed. No residual primers detected in Round 1 output."
+        # Copy to cleanest output
+        cp "$primerless_fasta_round1" "$cleanest_fasta_round1"
     fi
+    
+    # Clean up temp files after failsafe
+    rm -f "$temp_primers" "$temp_primer_locations" "$temp_sequences_with_primers"
+    
 else
     echo "WARNING: No sequences produced in Round 1 for sample: $identifier"
     exit 0
 fi
+
 #----------------------------------------#
 # OPTIONAL: Cluster Round 1 sequences
 if [ "$cluster_round1" = true ]; then
@@ -452,18 +471,16 @@ if [ "$cluster_round1" = true ]; then
         echo "Round 1 clustering completed: $clustered_fasta_round1"
         echo "Round 1 cluster info: ${clustered_fasta_round1}.clstr"
         
-        
         # Reactivate cutadapt for potential Round 2
         conda deactivate && source activate cutadapt
     else
         echo "No sequences in Round 1 to cluster"
-        
     fi
 fi
 
 #----------------------------------------#
-# ROUND 2: Unlinked primer trimming (Completed unless specified)
-if [ "$skip_round2" = false ] && [ -s "$untrimmed_fasta_round1" ]; then
+# ROUND 2: Unlinked primer trimming (Only if requested)
+if [ "$run_round2" = true ] && [ -s "$untrimmed_fasta_round1" ]; then
     echo "--- Round 2: Trimming untrimmed sequences with unlinked primers ---"
     
     # Build cutadapt command with unlinked primers
@@ -511,12 +528,16 @@ if [ "$skip_round2" = false ] && [ -s "$untrimmed_fasta_round1" ]; then
     echo "Round 2 completed."
     echo "  Trimmed sequences: $primerless_fasta_round2"
     
-elif [ "$skip_round2" = true ]; then
-    echo "--- Round 2 skipped as requested ---"
+elif [ "$run_round2" = true ]; then
+    echo "--- Round 2 requested but no untrimmed sequences from Round 1 ---"
     
 else
-    echo "--- Round 2 skipped: no untrimmed sequences from Round 1 ---"
-    
+    echo "--- Round 2 skipped (untrimmed sequences discarded) ---"
+    # Remove untrimmed file if Round 2 is not requested
+    if [ -f "$untrimmed_fasta_round1" ]; then
+        rm -f "$untrimmed_fasta_round1"
+        echo "  Removed untrimmed sequences file"
+    fi
 fi
 
 #----------------------------------------#
@@ -524,10 +545,10 @@ fi
 
 echo "Processing completed for $identifier"
 echo "Final outputs:"
-echo "  Round 1 (clean): $primerless_fasta_round1"
+echo "  Round 1 (clean): $cleanest_fasta_round1"
 if [ "$cluster_round1" = true ] && [ -f "$clustered_fasta_round1" ]; then
     echo "  Round 1 (clustered): $clustered_fasta_round1"
 fi
-if [ "$skip_round2" = false ] && [ -f "$primerless_fasta_round2" ]; then
+if [ "$run_round2" = true ] && [ -f "$primerless_fasta_round2" ]; then
     echo "  Round 2 (wrong primers): $primerless_fasta_round2"
 fi
