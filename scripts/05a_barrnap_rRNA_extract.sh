@@ -1,33 +1,36 @@
 #!/bin/bash
 #SBATCH --job-name=barrnap
-#SBATCH --mem=2G
+#SBATCH --mem=1G
 #SBATCH --cpus-per-task=1
 #SBATCH --time=01:00:00
 #SBATCH --output=%x_%j.log
-#SBATCH --array=1-169
+#SBATCH --array=1-96
 
 # Check if input directory argument is provided
 if [ $# -eq 0 ]; then
-    echo "Error: No input directory provided"
-    echo "Usage: sbatch $0 <assembled_directory>"
-    echo "Example: sbatch $0 /path/to/assembled"
+    echo "Error: No working directory provided"
+    echo "Usage: sbatch $0 /path/to/workdir/primerless"
+    echo "Example: sbatch $0 Lakes_day1/primerless"
     exit 1
 fi
 
-# Define input and output directories from command line argument
-input_base_dir="$1"  # assembled directory from command line
-basedir=$(dirname "$input_base_dir")  # Go up one level to get base directory
-output_base_dir="${basedir}/rRNAs"
+# Define directories
+workdir="$1"
+# Get the parent directory for output (Lakes_day1 instead of Lakes_day1/primerless)
+parent_dir=$(dirname "$workdir")
+input_pattern="${workdir}/*/rRNAs/cleaned_amplicon*.fasta"
+output_base_dir="${parent_dir}/rRNA_genes"
 
-echo "Input base dir: ${input_base_dir}"
-echo "Base directory: ${basedir}"
+echo "Working directory: ${workdir}"
+echo "Parent directory: ${parent_dir}"
+echo "Input pattern: ${input_pattern}"
 echo "Output base dir: ${output_base_dir}"
 
-# Create output directories
-mkdir -p "${output_base_dir}" "${split_files}" "${combined_rRNA}"
+# Create output directories for each gene type
+mkdir -p "${output_base_dir}/gene_18S" "${output_base_dir}/gene_28S"
 
 # Get the filename for the current task
-input_file=$(ls "${input_base_dir}"/*.contigs.renamed.fa | sed -n "${SLURM_ARRAY_TASK_ID}p")
+input_file=$(ls ${input_pattern} 2>/dev/null | sed -n "${SLURM_ARRAY_TASK_ID}p")
 echo "File being processed: ${input_file}"
 
 # Check if file exists
@@ -36,17 +39,43 @@ if [ ! -f "$input_file" ]; then
     exit 1
 fi
 
-# Extract identifier from filename
-identifier=$(basename "$input_file" .contigs.renamed.fa)
+# Extract sample identifier from path
+# From: <workdir>/<sample><dataset>/rRNAs/cleaned_amplicon*.fasta
+sample_path=$(dirname $(dirname "$input_file"))
+identifier=$(basename "$sample_path")
 
 echo "Identifier: ${identifier}"
 
 # Activate conda environment
 source activate barrnap
 
+# Create temporary directory for barrnap output
+temp_dir="${output_base_dir}/temp_${identifier}"
+mkdir -p "${temp_dir}"
+
 # Run barrnap
 barrnap -k euk -t 1 \
-    -o "${output_base_dir}/${identifier}_euk.fa" \
-    "${input_file}" > "${output_base_dir}/${identifier}_euk.gff3"
+    -o "${temp_dir}/${identifier}_euk.fa" \
+    "${input_file}" > "${temp_dir}/${identifier}_euk.gff3"
 
 echo "Barrnap completed for ${identifier}"
+
+# Split the output by rRNA type (keep only 18S and 28S)
+if [ -f "${temp_dir}/${identifier}_euk.fa" ]; then
+    # Extract 18S sequences
+    grep -A 1 "18S_rRNA" "${temp_dir}/${identifier}_euk.fa" | grep -v "^--$" > "${output_base_dir}/gene_18S/${identifier}_18S.fa"
+    
+    # Extract 28S sequences
+    grep -A 1 "28S_rRNA" "${temp_dir}/${identifier}_euk.fa" | grep -v "^--$" > "${output_base_dir}/gene_28S/${identifier}_28S.fa"
+    
+    echo "Split rRNA sequences for ${identifier}"
+    echo "18S sequences: $(grep -c "^>" "${output_base_dir}/gene_18S/${identifier}_18S.fa" 2>/dev/null || echo 0)"
+    echo "28S sequences: $(grep -c "^>" "${output_base_dir}/gene_28S/${identifier}_28S.fa" 2>/dev/null || echo 0)"
+else
+    echo "Warning: No barrnap output found for ${identifier}"
+fi
+
+# Clean up temporary files
+rm -rf "${temp_dir}"
+
+echo "Processing completed for ${identifier}"
