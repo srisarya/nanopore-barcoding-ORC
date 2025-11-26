@@ -144,11 +144,10 @@ if [ -z "$sample_amplicon_dir" ]; then
     exit 1
 fi
 
-echo "========================================="
+#----------------------------------------#
 echo "Array Task ID: $SLURM_ARRAY_TASK_ID / ${#sample_dirs[@]}"
 echo "Processing: $sample_amplicon_dir"
-echo "========================================="
-echo ""
+#----------------------------------------#
 
 # Get consensus file
 consensus_file=$(find "$sample_amplicon_dir" -type f -name "*_consensus_${amplicon_type}.fasta" | head -n 1)
@@ -171,18 +170,18 @@ echo "Amplicon type: $amplicon_type"
 output_dir="${basedir}/primerless/${identifier}/${amplicon_type}"
 mkdir -p "$output_dir"
 echo "Output directory: $output_dir"
-echo ""
+
 
 # Define output files
 primerless_fasta_round1="${output_dir}/round1_amplicon_${identifier}.fasta"
 cleanest_fasta_round1="${output_dir}/cleaned_amplicon_${identifier}.fasta"
 clustered_fasta_round1="${output_dir}/clustered_clean_amplicon_${identifier}.fasta"
 untrimmed_fasta_round1="${output_dir}/untrimmed_round1_${identifier}.fasta"
-primerless_fasta_round2="${output_dir}/clean_wrong_primers_${identifier}.fasta"
+primerless_fasta_round2="${output_dir}/wrong_primers_${identifier}.fasta"
 
-# ============================================
+#----------------------------------------#
 # Parse Round 1 primers and build pairs
-# ============================================
+
 echo "--- Parsing Round 1 primers from $r1_primers_file ---"
 
 declare -A r1_forward_primers
@@ -268,19 +267,9 @@ if [ -n "$current_header" ] && [ -n "$current_seq" ]; then
     fi
 fi
 
-# # NOW add debugging to verify what was stored
-# echo ""
-# echo "--- DEBUG: Verifying stored primers ---"
-# for pair_id in "${r1_pair_ids[@]}"; do
-#     echo "Pair $pair_id:"
-#     echo "  Forward: [${r1_forward_primers[$pair_id]}] (length: ${#r1_forward_primers[$pair_id]})"
-#     echo "  Reverse: [${r1_reverse_primers[$pair_id]}] (length: ${#r1_reverse_primers[$pair_id]})"
-# done
-# echo ""
-
-# ============================================
+#----------------------------------------#
 # Parse Round 2 primers if provided
-# ============================================
+
 echo "--- Parsing Round 2 primers from $r2_primers_file ---"
 
 declare -A r2_forward_primers
@@ -366,22 +355,15 @@ if [ -n "$r2_primers_file" ] && [ "$skip_round2" = false ]; then
         fi
     fi
 fi
-# # NOW add debugging to verify what was stored
-# echo ""
-# echo "--- DEBUG: Verifying stored primers ---"
-# for pair_id in "${r2_pair_ids[@]}"; do
-#     echo "Pair $pair_id:"
-#     echo "  Forward: [${r2_forward_primers[$pair_id]}] (length: ${#r2_forward_primers[$pair_id]})"
-#     echo "  Reverse: [${r2_reverse_primers[$pair_id]}] (length: ${#r2_reverse_primers[$pair_id]})"
-# done
-# echo ""
 
+
+#----------------------------------------#
 # Activate cutadapt environment
 source activate cutadapt
 
-# ============================================
+#----------------------------------------#
 # ROUND 1: Linked primer trimming
-# ============================================
+
 echo "--- Round 1: Trimming with linked primers ---"
 
 # Build cutadapt command with linked primer pairs
@@ -390,7 +372,6 @@ cutadapt_cmd="cutadapt -j $SLURM_CPUS_PER_TASK"
 for pair_id in "${r1_pair_ids[@]}"; do
     fwd="${r1_forward_primers[$pair_id]}"
     rev="${r1_reverse_primers[$pair_id]}"
-    
     if [ -n "$fwd" ] && [ -n "$rev" ]; then
         cutadapt_cmd="$cutadapt_cmd -g ${fwd}...${rev}"
         echo "Added linked pair $pair_id: ${fwd}...${rev}"
@@ -402,22 +383,16 @@ done
 # Add output options
 cutadapt_cmd="$cutadapt_cmd --untrimmed-output=$untrimmed_fasta_round1 -o $primerless_fasta_round1 $consensus_file"
 
-echo ""
-echo "Command: $cutadapt_cmd"
-echo ""
-
 # Execute cutadapt
 eval $cutadapt_cmd
 
-echo ""
 echo "Round 1 completed."
 echo "  Trimmed sequences: $primerless_fasta_round1"
 echo "  Untrimmed sequences: $untrimmed_fasta_round1"
-echo ""
 
-# ============================================
+#----------------------------------------#
 # FAILSAFE: Check for residual primers using seqkit locate
-# ============================================
+
 if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
     echo "--- Failsafe: Checking for residual primers with seqkit locate ---"
     
@@ -447,46 +422,27 @@ if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
     
     if [ -n "$sequences_with_primers" ]; then
         seq_count=$(echo "$sequences_with_primers" | wc -l)
-        
-        echo ""
-        echo "========================================="
         echo "WARNING: Found $seq_count sequence(s) with residual primers!"
         echo "Sample: $identifier"
         echo "Sequences with primers:"
         echo "$sequences_with_primers"
-        echo ""
         echo "These sequences still contain primer sequences after Round 1 trimming."
-        echo "========================================="
-        echo ""
-        
         # Extract unique sequence IDs that have primer hits (skip header line)
         cut -f1 "${output_dir}/primer_locations_${identifier}.txt" | sort -u > "${output_dir}/sequences_with_primers_${identifier}.txt"
-
         # Now use that file to exclude sequences
         seqkit grep -v -f "${output_dir}/sequences_with_primers_${identifier}.txt" "$primerless_fasta_round1" > "$cleanest_fasta_round1"
-
-        # Clean up temp files (commented out for user checks)
-        # rm -f "$temp_primers" "${output_dir}/primer_locations_${identifier}.txt"
+        removed_count=$(wc -l < "${output_dir}/sequences_with_primers_${identifier}.txt" | tr -d '[:space:]')
+        echo "Failsafe FAILED. Residual primers detected, removed ${removed_count} sequences."
         exit 0
     else
-        echo "Failsafe passed. No residual primers detected in Round 1 output."
-        echo ""
+        echo "Failsafe passed. No residual primers detected in Round 1 output."  
     fi
-    
-    # Clean up temp files (commented out for user checks)
-    # rm -f "$temp_primers" "${output_dir}/primer_locations_${identifier}.txt"
-    
-    # Reactivate cutadapt for downstream processing
-    conda deactivate && source activate cutadapt
 else
     echo "WARNING: No sequences produced in Round 1 for sample: $identifier"
-    echo ""
     exit 0
 fi
-
-# ============================================
+#----------------------------------------#
 # OPTIONAL: Cluster Round 1 sequences
-# ============================================
 if [ "$cluster_round1" = true ]; then
     if [ -f "$cleanest_fasta_round1" ] && [ -s "$cleanest_fasta_round1" ]; then
         echo "--- Clustering Round 1 sequences ---"
@@ -501,19 +457,18 @@ if [ "$cluster_round1" = true ]; then
         
         echo "Round 1 clustering completed: $clustered_fasta_round1"
         echo "Round 1 cluster info: ${clustered_fasta_round1}.clstr"
-        echo ""
+        
         
         # Reactivate cutadapt for potential Round 2
         conda deactivate && source activate cutadapt
     else
         echo "No sequences in Round 1 to cluster"
-        echo ""
+        
     fi
 fi
 
-# ============================================
+#----------------------------------------#
 # ROUND 2: Unlinked primer trimming (Completed unless specified)
-# ============================================
 if [ "$skip_round2" = false ] && [ -s "$untrimmed_fasta_round1" ]; then
     echo "--- Round 2: Trimming untrimmed sequences with unlinked primers ---"
     
@@ -555,32 +510,25 @@ if [ "$skip_round2" = false ] && [ -s "$untrimmed_fasta_round1" ]; then
     
     # Add output and input files
     cutadapt_r2_cmd="$cutadapt_r2_cmd -o $primerless_fasta_round2 $untrimmed_fasta_round1"
-    
-    echo ""
-    echo "Command: $cutadapt_r2_cmd"
-    echo ""
-    
+
     # Execute cutadapt
     eval $cutadapt_r2_cmd
     
-    echo ""
     echo "Round 2 completed."
     echo "  Trimmed sequences: $primerless_fasta_round2"
-    echo ""
+    
 elif [ "$skip_round2" = true ]; then
     echo "--- Round 2 skipped as requested ---"
-    echo ""
+    
 else
     echo "--- Round 2 skipped: no untrimmed sequences from Round 1 ---"
-    echo ""
+    
 fi
 
-# ============================================
+#----------------------------------------#
 # Summary
-# ============================================
-echo "========================================="
+
 echo "Processing completed for $identifier"
-echo "========================================="
 echo "Final outputs:"
 echo "  Round 1 (clean): $primerless_fasta_round1"
 if [ "$cluster_round1" = true ] && [ -f "$clustered_fasta_round1" ]; then
@@ -589,4 +537,3 @@ fi
 if [ "$skip_round2" = false ] && [ -f "$primerless_fasta_round2" ]; then
     echo "  Round 2 (wrong primers): $primerless_fasta_round2"
 fi
-echo ""
