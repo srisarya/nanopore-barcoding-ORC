@@ -29,8 +29,8 @@ outdir="$indir/pychopped"
 outfile="$outdir/pychopped_${basename_no_ext}.gz"
 
 # Static paths for primer sequences and config
-primer_seqs=nanopore-barcoding-ORC/adapters_hmms/M13_seqs_for_pychopper.fa # primer sequences plus N wildcards for variable section
-config=nanopore-barcoding-ORC/adapters_hmms/M13_config_for_pychopper.txt # configuration file for sequence orientation
+primer_seqs=nanopore-barcoding-ORC/adapters_primers/M13_seqs_for_pychopper.fa # primer sequences plus N wildcards for variable section
+config=nanopore-barcoding-ORC/adapters_primers/M13_config_for_pychopper.txt # configuration file for sequence orientation
 
 # Make directories if not existing already
 mkdir -p "$outdir"

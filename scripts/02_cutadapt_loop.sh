@@ -40,8 +40,8 @@ outdir="$parent_dir/demuxed"
 mkdir -p "$outdir"/{SP5,SP27}
 
 # Define adapter and primer paths
-adapters_SP5=nanopore-barcoding-ORC/adapters_hmms/M13_amplicon_indices_forward.fa
-adapters_SP27=nanopore-barcoding-ORC/adapters_hmms/M13_amplicon_indices_reverse_rc.fa
+adapters_SP5=nanopore-barcoding-ORC/adapters_primers/M13_amplicon_indices_forward.fa
+adapters_SP27=nanopore-barcoding-ORC/adapters_primers/M13_amplicon_indices_reverse_rc.fa
 echo "========================================="
 echo "Processing: $infile"
 echo "Dataset name: $dataset"
