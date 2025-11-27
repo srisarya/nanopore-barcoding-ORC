@@ -26,9 +26,6 @@ echo "Parent directory: ${parent_dir}"
 echo "Input pattern: ${input_pattern}"
 echo "Output base dir: ${output_base_dir}"
 
-# Create output directories for each gene type
-mkdir -p "${output_base_dir}/gene_18S" "${output_base_dir}/gene_28S"
-
 # Get the filename for the current task
 input_file=$(ls ${input_pattern} 2>/dev/null | sed -n "${SLURM_ARRAY_TASK_ID}p")
 echo "File being processed: ${input_file}"
@@ -46,11 +43,15 @@ identifier=$(basename "$sample_path")
 
 echo "Identifier: ${identifier}"
 
+# Create output directory for this sample
+sample_output_dir="${output_base_dir}/${identifier}"
+mkdir -p "${sample_output_dir}"
+
 # Activate conda environment
 source activate barrnap
 
 # Create temporary directory for barrnap output
-temp_dir="${output_base_dir}/temp_${identifier}"
+temp_dir="${sample_output_dir}/temp"
 mkdir -p "${temp_dir}"
 
 # Run barrnap
@@ -63,14 +64,14 @@ echo "Barrnap completed for ${identifier}"
 # Split the output by rRNA type (keep only 18S and 28S)
 if [ -f "${temp_dir}/${identifier}_euk.fa" ]; then
     # Extract 18S sequences
-    grep -A 1 "18S_rRNA" "${temp_dir}/${identifier}_euk.fa" | grep -v "^--$" > "${output_base_dir}/gene_18S/${identifier}_18S.fa"
+    grep -A 1 "18S_rRNA" "${temp_dir}/${identifier}_euk.fa" | grep -v "^--$" > "${sample_output_dir}/${identifier}_18S.fa"
     
     # Extract 28S sequences
-    grep -A 1 "28S_rRNA" "${temp_dir}/${identifier}_euk.fa" | grep -v "^--$" > "${output_base_dir}/gene_28S/${identifier}_28S.fa"
+    grep -A 1 "28S_rRNA" "${temp_dir}/${identifier}_euk.fa" | grep -v "^--$" > "${sample_output_dir}/${identifier}_28S.fa"
     
     echo "Split rRNA sequences for ${identifier}"
-    echo "18S sequences: $(grep -c "^>" "${output_base_dir}/gene_18S/${identifier}_18S.fa" 2>/dev/null || echo 0)"
-    echo "28S sequences: $(grep -c "^>" "${output_base_dir}/gene_28S/${identifier}_28S.fa" 2>/dev/null || echo 0)"
+    echo "18S sequences: $(grep -c "^>" "${sample_output_dir}/${identifier}_18S.fa" 2>/dev/null || echo 0)"
+    echo "28S sequences: $(grep -c "^>" "${sample_output_dir}/${identifier}_28S.fa" 2>/dev/null || echo 0)"
 else
     echo "Warning: No barrnap output found for ${identifier}"
 fi
