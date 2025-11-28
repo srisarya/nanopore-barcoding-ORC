@@ -22,19 +22,19 @@
 ## The workflow
 ![bioinformatic workflow for processing DNA barcoding, from raw data to reorienting, demuxing, consensus building, cleaning, getting gene sequences, and selecting the best hits](schematics/new_strategy_DNA_Barcoding.png)
 
-  1. `01_pychopper.sh`: `sbatch $0 <input_fastq_file>`
+  1. `01_pychopper.sh`: `sbatch $0 /path/to/dataset/raw_fastq_file`
      * To reorient and quality-score trim cDNA reads into the same orientation
      * This script takes in 2 extra files, which are hardcoded into the script:
        * one which has the orientation of adapters sequences listed (`M13_config_for_pychopper.txt`)
        * one which has the non-variable sequences for the adapters (`M13_seqs_for_pychopper.fa`)
   
-  2. `02_cutadapt_loop.sh`: `sbatch $0 /path/to/pychopped/pychopped_sample1.fastq.gz`
+  2. `02_cutadapt_loop.sh`: `sbatch $0 /path/to/dataset/pychopped/pychopped_sample1.fastq.gz`
        * A loop which first demultiplexes the reads based on the 5' SP5 primers, and then, one-by-one, demultiplexes each output from the SP5 demultiplexing by the SP27 3' primers. It also trims adapters on the fly.
        * This script takes in 2 extra files, which are hardcoded into the script: the 5' and 3' adapter sequences, `M13_amplicon_indices_forward.fa` and the reverse complement of the 3' sequences (since we reoriented before with pychopper, `M13_amplicon_indices_reverse_rc.fa`)
        * You may notice that we do bin reads into adapter combinations which do not exist! Though this is inefficient, it's not the end of the world, since we have sequenced deeply enough per individual that enough reads are binned into the correct adapter combinations
        * These non-existing adapter combos are removed after demuxing, along with the 'unknown' bins, since we don't want to analyse them later on. 
   
-  3. `03_amplicon_sorter.sh`: `sbatch $0 -input /path/to/demuxed/2nd_round [-min <int> -max <int> -prefix <amplicon>]`
+  3. `03_amplicon_sorter.sh`: `sbatch $0 -input /path/to/dataset/demuxed/2nd_round [-min <int> -max <int> -prefix <amplicon>]`
      * The workflow is more dynamic here, since the user may be analysing different amplicons for us. In _our_ wet-lab protocol:
        * For the rRNAs, we use 2 sets of primers to amplify overlapping segments of the nuclear rRNA cistron, so a sequence can be anywhere over 3Kb in length
        * For the COIs, we use 2 alternate options for a forward primer, and one option for a reverse primer, to amplify 'redundant' sequences of a COI barcode segment (the 2 alternate options for the forward primer allow for matching more taxa than just one), so a sequence can be between 300bp-900bp in length
@@ -48,7 +48,7 @@
        * Optionally, the user can choose to trim 'untrimmed' sequences with alternate primers
        * There is another optional further step to collapse sequences to make them non-redundant using `cd-hit`, for example, if you're doing a COI barcode with multiple primer options
   
-  5. `05a_barrnap_rRNA_extract.sh`: `sbatch $0 /path/to/workdir/primerless`
+  5. `05a_barrnap_rRNA_extract.sh`: `sbatch $0 /path/to/dataset/primerless`
        * This script uses Barrnap version 0.9. It takes the assembled contigs and uses an HMM to extract sequences matching 28S and 18S rRNA profiles.
   
   6. `05b_reorganise_COIs.sh`: `sbatch $0 /path/to/dataset/primerless`
