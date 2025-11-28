@@ -22,31 +22,37 @@
 ## The workflow
 ![bioinformatic workflow for processing DNA barcoding, from raw data to reorienting, demuxing, consensus building, cleaning, getting gene sequences, and selecting the best hits](schematics/new_strategy_DNA_Barcoding.png)
 
-  1. `01_pychopper.sh`: This script reorients and quality-score trims cDNA reads into the same orientation
+  1. `01_pychopper.sh`: `sbatch $0 <input_fastq_file>`
+     * To reorient and quality-score trim cDNA reads into the same orientation
      * This script takes in 2 extra files, which are hardcoded into the script:
        * one which has the orientation of adapters sequences listed (`M13_config_for_pychopper.txt`)
        * one which has the non-variable sequences for the adapters (`M13_seqs_for_pychopper.fa`)
   
-  2. `02_cutadapt_loop.sh`: This script is a loop which first demultiplexes the reads based on the 5' SP5 primers, and then one-by-one, demultiplexes each output from the SP5 demultiplexing by the SP27 3' primers. It also trims adapters on-the-fly.
+  2. `02_cutadapt_loop.sh`: `sbatch $0 /path/to/pychopped/pychopped_sample1.fastq.gz`
+       * A loop which first demultiplexes the reads based on the 5' SP5 primers, and then, one-by-one, demultiplexes each output from the SP5 demultiplexing by the SP27 3' primers. It also trims adapters on the fly.
        * This script takes in 2 extra files, which are hardcoded into the script: the 5' and 3' adapter sequences, `M13_amplicon_indices_forward.fa` and the reverse complement of the 3' sequences (since we reoriented before with pychopper, `M13_amplicon_indices_reverse_rc.fa`)
        * You may notice that we do bin reads into adapter combinations which do not exist! Though this is inefficient, it's not the end of the world, since we have sequenced deeply enough per individual that enough reads are binned into the correct adapter combinations
        * These non-existing adapter combos are removed after demuxing, along with the 'unknown' bins, since we don't want to analyse them later on. 
   
-  3. `03_amplicon_sorter.sh`
-     * The workflow is more dynamic here, since the user may be analysing different amplicons to us. In _our_ wet-lab protocol:
-      * For the rRNAs, we use 2 sets of primers to amplify overlapping segments of the nuclear rRNA cistron, so a sequence can be anywhere over 3Kb in length
-      * For the COIs, we use 2 alternate options for a forward primer, and one option for a reverse primer, to amplify 'redundant' sequences of a COI barcode segment (the 2 alternate options for the forward primer allow for matching more taxa than just one), so a sequence can be between 300bp-900bp in length
+  3. `03_amplicon_sorter.sh`: `sbatch $0 -input /path/to/demuxed/2nd_round [-min <int> -max <int> -prefix <amplicon>]`
+     * The workflow is more dynamic here, since the user may be analysing different amplicons for us. In _our_ wet-lab protocol:
+       * For the rRNAs, we use 2 sets of primers to amplify overlapping segments of the nuclear rRNA cistron, so a sequence can be anywhere over 3Kb in length
+       * For the COIs, we use 2 alternate options for a forward primer, and one option for a reverse primer, to amplify 'redundant' sequences of a COI barcode segment (the 2 alternate options for the forward primer allow for matching more taxa than just one), so a sequence can be between 300bp-900bp in length
      * The amplicon sorter step splits samples' reads by size and clusters them by sequence
-     * The variables (min length, max length, prefix name for amplicon type, and input folder) are user defined :)
+     * The variables (min length, max length, prefix name for amplicon type, and input folder) are user-defined :)
   
-  4. `04a_cleaning_rRNAs.sh` and/or `04b_cleaning_COIs.sh`
+  4. `04a_cleaning_primers.sh`: `sbatch $0 <amplicon_sorted_dir> <amplicon_type> --r1-primers <file> --r2-primers <file> [--run-round2 --cluster-round1]`
        * This script takes each clustered (amplicon-sorted) file and removes the primer sequences from the amplicon sequences, since these are synthetic
-       * for the 04b_cleaning_COIs.sh, we add an additional step to collapse sequences to make them non-redundant
+       * The user can define the primer sequences to remove based on the amplicon they are sequencing, but if more than one amplicon was sequenced in a run, the other primer sets can also be submitted as a back check
+       * Sequences with lone primers, mismatched primers, or >1 primer of a kind are removed in a failsafe
+       * Optionally, the user can choose to trim 'untrimmed' sequences with alternate primers
+       * There is another optional further step to collapse sequences to make them non-redundant using `cd-hit`, for example, if you're doing a COI barcode with multiple primer options
   
-  5. `05a_barrnap_rRNA_extract.sh` and/or `05b_nhmmer_COI_extract`: 
-       * 05a_barrnap_rRNA_extract.sh: this script uses barrnap version 0.9. It takes the assembled contigs, and uses a HMM to extract sequences matching 28S and 18S rRNA profiles.
-       * 05b_nhmmer_COI_extract.sh: this script runs an nhmmer search against custom pre-built COI HMM profiles and extracts the sequences
-        * Speak to me if you'd like to know how I did this, since it's part of a larger project :) 
+  5. `05a_barrnap_rRNA_extract.sh`: `sbatch $0 /path/to/workdir/primerless`
+       * This script uses Barrnap version 0.9. It takes the assembled contigs and uses an HMM to extract sequences matching 28S and 18S rRNA profiles.
+  
+  6. `05b_reorganise_COIs.sh`: `sbatch $0 /path/to/dataset/primerless`
+       *  This is a straightforward script copying over the cleaned, clustered/non-redundant primerless COIs from the primerless directory to a COI directory for clarity
 
 ## Primer schematics
 ### rRNA amplification
