@@ -48,11 +48,12 @@
        * Optionally, the user can choose to trim 'untrimmed' sequences with alternate primers
        * There is another optional further step to collapse sequences to make them non-redundant using `cd-hit`, for example, if you're doing a COI barcode with multiple primer options
   
-  5. `05a_barrnap_rRNA_extract.sh`: `sbatch $0 /path/to/dataset/primerless`
-       * This script uses Barrnap version 0.9. It takes the assembled contigs and uses an HMM to extract sequences matching 28S and 18S rRNA profiles.
-  
-  6. `05b_reorganise_COIs.sh`: `sbatch $0 /path/to/dataset/primerless`
-       *  This is a straightforward script copying over the cleaned, clustered/non-redundant primerless COIs from the primerless directory to a COI directory for clarity
+  5. `05a_barrnap_rRNA_extract.sh`: `sbatch $0 /path/to/dataset/primerless` and `05b_reorganise_COIs.sh`: `sbatch $0 /path/to/dataset/primerless`
+       * 5a script uses Barrnap version 0.9. It takes the assembled contigs and uses an HMM to extract sequences matching 28S and 18S rRNA profiles.
+       * 5b is a straightforward script copying over the cleaned, clustered/non-redundant primerless COIs from the primerless directory to a COI directory for clarity
+  6. `06_summary.sh`: `$0 <dataset_path> <amplicon> [gene, optional]`
+      * This wrapper script calls for an R script which creates a tsv of the sample, whether hits of the amplicon were found in the processing of the data, what the highest coverage was for an amplicon, and which hit it is for that amplicon per sample
+      * If an amplicon is found (yay!) then the header for the ebst hit is printed. If no amplicon was retrieved for that sample (boo), NA is there.
 
 ## Primer schematics
 ### rRNA amplification
