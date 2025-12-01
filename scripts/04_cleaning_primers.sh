@@ -359,7 +359,6 @@ if [ "$run_round2" = true ] && [ -n "$r2_primers_file" ]; then
     fi
 fi
 
-
 #----------------------------------------#
 # Activate cutadapt environment
 source activate cutadapt
@@ -413,8 +412,15 @@ if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
     primer_count=$(grep -c "^>" "$temp_primers")
     echo "Checking for $primer_count primers..."
     
-    # Use seqkit locate to find sequences with primers
-    seqkit locate -d --pattern-file "$temp_primers" "$primerless_fasta_round1" > "$temp_primer_locations" 2>/dev/null
+    # Extract first and last 100 bases from each sequence
+    temp_ends="${output_dir}/${identifier}_sequence_ends.fasta"
+    seqkit subseq -r 1:100 "$primerless_fasta_round1" > "$temp_ends"
+    head "$temp_ends"
+    seqkit subseq -r -100:-1 "$primerless_fasta_round1" >> "$temp_ends"
+    tail "$temp_ends"
+    
+    # Use seqkit locate to find sequences with primers in the terminal regions
+    seqkit locate -d --pattern-file "$temp_primers" "$temp_ends" > "$temp_primer_locations" 2>/dev/null
     
     # Extract unique sequence IDs that have primer hits (skip header line)
     sequences_with_primers=$(tail -n +2 "$temp_primer_locations" | cut -f1 | uniq)
@@ -437,7 +443,7 @@ if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
         echo "Failsafe FAILED. Residual primers detected, removed ${removed_count} sequences."
         
         # Clean up temp files
-        rm -f "$temp_primers" "$temp_primer_locations" "$temp_sequences_with_primers"
+        rm -f "$temp_primers" "$temp_primer_locations" "$temp_sequences_with_primers" "$temp_ends"
         
         exit 0
     else
@@ -447,7 +453,7 @@ if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
     fi
     
     # Clean up temp files after failsafe
-    rm -f "$temp_primers" "$temp_primer_locations" "$temp_sequences_with_primers"
+    rm -f "$temp_primers" "$temp_primer_locations" "$temp_sequences_with_primers" "$temp_ends"
     
 else
     echo "WARNING: No sequences produced in Round 1 for sample: $identifier"
