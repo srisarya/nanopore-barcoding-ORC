@@ -159,7 +159,7 @@ mkdir -p "${outfolder_rRNAs}"
 source activate amplicon_sorter
 
 # Construct the command with conditional size parameters
-as_cmd="python3 nanopore-barcoding-ORC/scripts/for_AS/amplicon_sorter.py \
+as_cmd="python3 nanopore-barcoding-ORC/scripts/auxiliary_code/amplicon_sorter.py \
  -i ${file} \
  -o ${outfolder_rRNAs} \
  -ar \
