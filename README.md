@@ -19,7 +19,7 @@
 - To run this code, git clone this whole repo, keeping the adapter directory and the scripts directory in the relative places they're in so that the codes run smoothly (or, edit the code yourself only in your cloned remote repo!
 
 ## The workflow
-![bioinformatic workflow for processing DNA barcoding, from raw data to reorienting, demuxing, consensus building, cleaning, getting gene sequences, and selecting the best hits](schematics/new_strategy_DNA_Barcoding.png)
+![bioinformatic workflow for processing DNA barcoding, from raw data to reorienting, demuxing, consensus building, cleaning, getting gene sequences, and selecting the best hits](schematics/DNA_Barcoding_workflow.png)
 
   1. `01_pychopper.sh`: `sbatch $0 /path/to/dataset/raw_fastq_file`
      * To reorient and quality-score trim cDNA reads into the same orientation
