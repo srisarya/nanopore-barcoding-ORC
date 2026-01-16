@@ -10,6 +10,7 @@
 usage() {
     cat << EOF
 Usage: sbatch $0 <amplicon_sorted_dir> <amplicon_type> --r1-primers <file> [options]
+Note: initial testing was done to cluster contigs with CD-hits-est after cleaning; this was ultimately NOT used in the final result
 
 Required arguments:
   <amplicon_sorted_dir>    Base directory containing sample subdirectories (e.g., Lakes_day1/amplicon_sorted)
@@ -19,7 +20,6 @@ Required arguments:
 Optional arguments:
   --r2-primers <file>      FASTA file with Round 2 primers (unlinked, degenerate bases permitted)
   --run-round2             Run Round 2 trimming on untrimmed sequences (default: skip Round 2)
-  --cluster-round1         Cluster Round 1 output sequences with cd-hit-est
 
 Primer FASTA format:
   - Headers must contain "Forward" or "Reverse" to indicate primer orientation
@@ -43,7 +43,7 @@ Examples:
 
 Usage:
   # Default (skip Round 2, discard untrimmed sequences):
-  sbatch $0 Lakes_day1/amplicon_sorted COIs --r1-primers primers_r1.fasta --cluster-round1
+  sbatch $0 Lakes_day1/amplicon_sorted COIs --r1-primers primers_r1.fasta
   
   # With Round 2 trimming:
   sbatch $0 Lakes_day1/amplicon_sorted COIs --r1-primers primers_r1.fasta --r2-primers primers_r2.fasta --run-round2
@@ -59,7 +59,6 @@ amplicon_type=""
 r1_primers_file=""
 r2_primers_file=""
 run_round2=false
-cluster_round1=false
 
 # Parse arguments
 if [ $# -lt 2 ]; then
@@ -82,10 +81,6 @@ while [[ $# -gt 0 ]]; do
             ;;
         --run-round2)
             run_round2=true
-            shift
-            ;;
-        --cluster-round1)
-            cluster_round1=true
             shift
             ;;
         --help|-h)
@@ -172,7 +167,6 @@ echo "Output directory: $output_dir"
 # Define output files
 primerless_fasta_round1="${output_dir}/round1_amplicon_${identifier}.fasta"
 cleanest_fasta_round1="${output_dir}/cleaned_amplicon_${identifier}.fasta"
-clustered_fasta_round1="${output_dir}/clustered_clean_amplicon_${identifier}.fasta"
 untrimmed_fasta_round1="${output_dir}/untrimmed_round1_${identifier}.fasta"
 primerless_fasta_round2="${output_dir}/wrong_primers_${identifier}.fasta"
 
@@ -461,30 +455,6 @@ else
 fi
 
 #----------------------------------------#
-# OPTIONAL: Cluster Round 1 sequences
-if [ "$cluster_round1" = true ]; then
-    if [ -f "$cleanest_fasta_round1" ] && [ -s "$cleanest_fasta_round1" ]; then
-        echo "--- Clustering Round 1 sequences ---"
-        conda deactivate && source activate cd-hit
-        
-        cd-hit-est \
-            -i "$cleanest_fasta_round1" \
-            -o "$clustered_fasta_round1" \
-            -c 0.97 \
-            -T "$SLURM_CPUS_PER_TASK" \
-            -M 2000
-        
-        echo "Round 1 clustering completed: $clustered_fasta_round1"
-        echo "Round 1 cluster info: ${clustered_fasta_round1}.clstr"
-        
-        # Reactivate cutadapt for potential Round 2
-        conda deactivate && source activate cutadapt
-    else
-        echo "No sequences in Round 1 to cluster"
-    fi
-fi
-
-#----------------------------------------#
 # ROUND 2: Unlinked primer trimming (Only if requested)
 if [ "$run_round2" = true ] && [ -s "$untrimmed_fasta_round1" ]; then
     echo "--- Round 2: Trimming untrimmed sequences with unlinked primers ---"
@@ -551,10 +521,7 @@ fi
 
 echo "Processing completed for $identifier"
 echo "Final outputs:"
-echo "  Round 1 (clean): $cleanest_fasta_round1"
-if [ "$cluster_round1" = true ] && [ -f "$clustered_fasta_round1" ]; then
-    echo "  Round 1 (clustered): $clustered_fasta_round1"
-fi
+echo "Clean: $cleanest_fasta_round1"
 if [ "$run_round2" = true ] && [ -f "$primerless_fasta_round2" ]; then
-    echo "  Round 2 (wrong primers): $primerless_fasta_round2"
+    echo "Optional round 2 (wrong primers removed): $primerless_fasta_round2"
 fi
