@@ -8,7 +8,6 @@
   * Amplicon Sorter (no releases, separate conda packages to install)
     `conda create -n amplicon_sorter && conda install bioconda::python-edlib biopython matplotlib` 
   * seqkit v2.9.0: `conda create -n seqkit bioconda::seqkit`
-  * cd-hit v4.8.1: `conda create -n cd-hit bioconda::cd-hit`
   * barrnap v0.9: `conda create -n barrnap bioconda::barrnap`
   * seqtk v1.4-r122: `conda create -n seqtk bioconda::seqtk`
   * hmmer v3.1b2: `conda create -n hmmer bioconda::hmmer`
@@ -46,19 +45,18 @@
        * The user can define the primer sequences to remove based on the amplicon they are sequencing, but if more than one amplicon was sequenced in a run, the other primer sets can also be submitted as a back check
        * Sequences with lone primers, mismatched primers, or >1 primer of a kind are removed in a failsafe
        * Optionally, the user can choose to trim 'untrimmed' sequences with alternate primers
-       * There is another optional further step to collapse sequences to make them non-redundant using `cd-hit`, for example, if you're doing a COI barcode with multiple primer options
   
   5. `05a_barrnap_rRNA_extract.sh`: `sbatch $0 /path/to/dataset/primerless` and `05b_reorganise_COIs.sh`: `sbatch $0 /path/to/dataset/primerless`
        * 5a script uses Barrnap version 0.9. It takes the assembled contigs and uses an HMM to extract sequences matching 28S and 18S rRNA profiles.
        * 5b is a straightforward script copying over the cleaned, clustered/non-redundant primerless COIs from the primerless directory to a COI directory for clarity
   6. `06_summary.sh`: `$0 <dataset_path> <amplicon> [gene, optional]`
       * This wrapper script calls for an R script which creates a tsv of the sample, whether hits of the amplicon were found in the processing of the data, what the highest coverage was for an amplicon, and which hit it is for that amplicon per sample
-      * If an amplicon is found (yay!) then the header for the ebst hit is printed. If no amplicon was retrieved for that sample (boo), NA is there.
+      * If an amplicon is found (yay!) then the header for the best hit is printed. If no amplicon was retrieved for that sample (boo), NA is there.
 
 ## Primer schematics
 ### rRNA amplification
-![schematic for amplification of 18S/5.8S/partial 28S rRNA cistron, showing wiggly purple line representing DNA, yelllow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](schematics/18Setc.png)
-![schematic for amplification of full 28S rRNA gene, showing wiggly purple line representing DNA, yelllow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](schematics/28S_full.png)
+![schematic for amplification of 18S/5.8S/partial 28S rRNA cistron, showing wiggly purple line representing DNA, yellow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](schematics/18Setc.png)
+![schematic for amplification of full 28S rRNA gene, showing wiggly purple line representing DNA, yellow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](schematics/28S_full.png)
 
 ### COI amplification
-![schematic for amplification of partial COI gene, showing wiggly purple line representing DNA, yelllow boxes where COI gene is (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify COI, not to scale](schematics/COI.png)
+![schematic for amplification of partial COI gene, showing wiggly purple line representing DNA, yellow boxes where COI gene is (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify COI, not to scale](schematics/COI.png)
