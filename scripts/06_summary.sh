@@ -17,7 +17,7 @@ fi
 # Assign command line arguments
 base_dir=$1
 amplicon=$2
-gene=${3}  # Use $3 if provided, otherwise default to "18S"
+gene=${3:-""}  # Use empty string as default if gene not provided
 
 source activate R
 
@@ -29,6 +29,10 @@ fi
 
 echo "Processing directory: $base_dir"
 echo "Amplicon: $amplicon"
-echo "Gene: $gene"
-
-Rscript nanopore-barcoding-ORC/scripts/auxiliary_code/amplicon_summary.R "$base_dir" "$amplicon" "$gene"
+if [ -n "$gene" ]; then
+    echo "Gene: $gene"
+    Rscript nanopore-barcoding-ORC/scripts/auxiliary_code/amplicon_summary.R "$base_dir" "$amplicon" "$gene"
+else
+    echo "Gene: (not specified)"
+    Rscript nanopore-barcoding-ORC/scripts/auxiliary_code/amplicon_summary.R "$base_dir" "$amplicon"
+fi

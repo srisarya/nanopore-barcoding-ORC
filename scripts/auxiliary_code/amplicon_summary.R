@@ -56,7 +56,7 @@ amplicon_folder <- matching_dirs[1]
 
 # Construct output prefix automatically
 base_name <- basename(base_dir)
-if (!is.null(gene_keyword)) {
+if (!is.null(gene_keyword) && gene_keyword != "") {
   output_prefix <- paste0(base_name, "_", gene_keyword, "_summary")
 } else {
   output_prefix <- paste0(base_name, "_", amplicon_keyword, "_summary")
@@ -85,6 +85,12 @@ for (i in seq_along(sample_dirs)) {
   sample_name <- sample_names[i]
   sample_dir <- sample_dirs[i]
   
+  # Extract just the barcode pattern from sample name
+  barcode_only <- regmatches(sample_name, regexpr("SP27_[0-9]{3}_SP5_[0-9]{3}", sample_name))
+  if (length(barcode_only) == 0) {
+    barcode_only <- sample_name  # Fallback to original name if pattern not found
+  }
+  
   # Find all fasta/fa files in this directory
   all_fasta_files <- list.files(sample_dir, pattern = "\\.(fasta|fa)$", full.names = TRUE)
   
@@ -96,7 +102,7 @@ for (i in seq_along(sample_dirs)) {
     if (length(fasta_files) == 0 && length(all_fasta_files) > 0) {
       # Gene-specific file not found, but other fasta files exist
       results_list[[i]] <- data.frame(
-        sample = sample_name,
+        sample = barcode_only,
         amplicon_found = "no",
         num_hits = 0L,
         best_hit_readcount = NA_integer_,
@@ -110,9 +116,9 @@ for (i in seq_along(sample_dirs)) {
   }
   
   if (length(fasta_files) == 0) {
-    # No amplicon found
+    # No amplicon file found
     results_list[[i]] <- data.frame(
-      sample = sample_name,
+      sample = barcode_only,
       amplicon_found = "no",
       num_hits = 0L,
       best_hit_readcount = NA_integer_,
@@ -120,7 +126,7 @@ for (i in seq_along(sample_dirs)) {
       stringsAsFactors = FALSE
     )
   } else {
-    # Amplicon found - process all fasta files
+    # Files found - process all fasta files and check if they contain sequences
     all_readcounts <- integer(0)
     all_headers <- character(0)
     total_sequences <- 0L
@@ -160,29 +166,82 @@ for (i in seq_along(sample_dirs)) {
       }
     }
     
-    # Find best hit readcount and corresponding header
-    if (length(all_readcounts) > 0) {
-      best_idx <- which.max(all_readcounts)
-      best_readcount <- all_readcounts[best_idx]
-      best_header <- all_headers[best_idx]
+    # Check if file(s) were empty (no sequences found)
+    if (total_sequences == 0) {
+      # Files exist but are empty
+      results_list[[i]] <- data.frame(
+        sample = barcode_only,
+        amplicon_found = "no",
+        num_hits = 0L,
+        best_hit_readcount = NA_integer_,
+        best_hit_header = NA_character_,
+        stringsAsFactors = FALSE
+      )
     } else {
-      best_readcount <- NA_integer_
-      best_header <- NA_character_
+      # Files contain sequences - amplicon found
+      # Find best hit readcount and corresponding header
+      if (length(all_readcounts) > 0) {
+        best_idx <- which.max(all_readcounts)
+        best_readcount <- all_readcounts[best_idx]
+        best_header <- all_headers[best_idx]
+      } else {
+        best_readcount <- NA_integer_
+        best_header <- NA_character_
+      }
+      
+      results_list[[i]] <- data.frame(
+        sample = barcode_only,
+        amplicon_found = "yes",
+        num_hits = total_sequences,
+        best_hit_readcount = best_readcount,
+        best_hit_header = best_header,
+        stringsAsFactors = FALSE
+      )
     }
-    
-    results_list[[i]] <- data.frame(
-      sample = sample_name,
-      amplicon_found = "yes",
-      num_hits = total_sequences,
-      best_hit_readcount = best_readcount,
-      best_hit_header = best_header,
-      stringsAsFactors = FALSE
-    )
   }
 }
 
 # Combine results into data frame
 results <- bind_rows(results_list)
+
+# Define expected barcode combinations
+# SP27_001 to SP27_008 combined with SP5_001 to SP5_012
+expected_barcodes <- c()
+for (sp27_num in 1:8) {
+  for (sp5_num in 1:12) {
+    barcode <- sprintf("SP27_%03d_SP5_%03d", sp27_num, sp5_num)
+    expected_barcodes <- c(expected_barcodes, barcode)
+  }
+}
+
+# Extract just the barcode part from sample names (remove any suffix after the barcode)
+# Sample names may have format like "SP27_001_SP5_001_BWplate1"
+found_samples <- results$sample
+found_barcodes <- sapply(found_samples, function(s) {
+  # Extract the SP27_XXX_SP5_XXX pattern
+  match <- regmatches(s, regexpr("SP27_[0-9]{3}_SP5_[0-9]{3}", s))
+  if (length(match) > 0) return(match) else return(s)
+}, USE.NAMES = FALSE)
+
+# Find missing barcodes
+missing_barcodes <- setdiff(expected_barcodes, found_barcodes)
+
+# Add missing barcodes to results (without any suffix)
+if (length(missing_barcodes) > 0) {
+  cat("\nMissing barcode combinations found:", length(missing_barcodes), "\n")
+  cat("Missing barcodes:", paste(missing_barcodes, collapse = ", "), "\n")
+  
+  missing_df <- data.frame(
+    sample = missing_barcodes,
+    amplicon_found = "no",
+    num_hits = 0L,
+    best_hit_readcount = NA_integer_,
+    best_hit_header = NA_character_,
+    stringsAsFactors = FALSE
+  )
+  
+  results <- bind_rows(results, missing_df)
+}
 
 # Sort by sample name
 results <- results %>% arrange(sample)
