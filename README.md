@@ -8,7 +8,7 @@
   * Amplicon Sorter (no releases, separate conda packages to install)
     `conda create -n amplicon_sorter && conda install bioconda::python-edlib biopython matplotlib` 
   * seqkit v2.9.0: `conda create -n seqkit bioconda::seqkit`
-  * barrnap v0.9: `conda create -n barrnap bioconda::barrnap`
+  * pybarrnap v0.5.1: `conda create -n pybarrnap -c conda-forge -c bioconda pybarrnap -c bioconda infernal`
   * seqtk v1.4-r122: `conda create -n seqtk bioconda::seqtk`
   * hmmer v3.1b2: `conda create -n hmmer bioconda::hmmer`
   * bedtools v2.31.1: `conda create -n bedtools bioconda::bedtools`
@@ -46,10 +46,11 @@
        * Sequences with lone primers, mismatched primers, or >1 primer of a kind are removed in a failsafe
        * Optionally, the user can choose to trim 'untrimmed' sequences with alternate primers
   
-  5. `05a_barrnap_rRNA_extract.sh`: `sbatch $0 /path/to/dataset/primerless` and `05b_reorganise_COIs.sh`: `sbatch $0 /path/to/dataset/primerless`
-       * 5a script uses Barrnap version 0.9. It takes the assembled contigs and uses an HMM to extract sequences matching 28S and 18S rRNA profiles.
+  5. `05a_pybarrnap_rDNA_extract.sh`: `sbatch $0 /path/to/dataset/primerless` and `05b_reorganise_COIs.sh`: `sbatch $0 /path/to/dataset/primerless`
+       * 5a script uses pybarrnap version 0.5.1. It takes the assembled contigs and uses an covariance model based on Rfam(14.10) to extract sequences matching 28S and 18S rDNA profiles from our amplicon contigs.
        * 5b is a straightforward script copying over the cleaned, clustered/non-redundant primerless COIs from the primerless directory to a COI directory for clarity
-  6. `06_summary.sh`: `$0 <dataset_path> <amplicon> [gene, optional]`
+  
+6. `06_summary.sh`: `$0 <dataset_path> <amplicon> [gene, optional]`
       * This wrapper script calls for an R script which creates a tsv of the sample, whether hits of the amplicon were found in the processing of the data, what the highest coverage was for an amplicon, and which hit it is for that amplicon per sample
       * If an amplicon is found (yay!) then the header for the best hit is printed. If no amplicon was retrieved for that sample (boo), NA is there.
 
