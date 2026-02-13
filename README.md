@@ -8,6 +8,7 @@
   * Amplicon Sorter (no releases, separate conda packages to install)
     `conda create -n amplicon_sorter && conda install bioconda::python-edlib biopython matplotlib` 
   * seqkit v2.9.0: `conda create -n seqkit bioconda::seqkit`
+  * barrnap v0.9: `conda create -n barrnap bioconda::barrnap==0.9`
   * pybarrnap v0.5.1: `conda create -n pybarrnap -c conda-forge -c bioconda pybarrnap -c bioconda infernal`
   * seqtk v1.4-r122: `conda create -n seqtk bioconda::seqtk`
   * hmmer v3.1b2: `conda create -n hmmer bioconda::hmmer`
