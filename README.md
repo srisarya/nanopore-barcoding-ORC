@@ -50,10 +50,6 @@
        * 5a script uses pybarrnap version 0.5.1. It takes the assembled contigs and uses an covariance model based on Rfam(14.10) to extract sequences matching 28S and 18S rDNA profiles from our amplicon contigs.
        * 5b is a straightforward script copying over the cleaned, clustered/non-redundant primerless COIs from the primerless directory to a COI directory for clarity
   
-6. `06_summary.sh`: `$0 <dataset_path> <amplicon> [gene, optional]`
-      * This wrapper script calls for an R script which creates a tsv of the sample, whether hits of the amplicon were found in the processing of the data, what the highest coverage was for an amplicon, and which hit it is for that amplicon per sample
-      * If an amplicon is found (yay!) then the header for the best hit is printed. If no amplicon was retrieved for that sample (boo), NA is there.
-
 ## Primer schematics
 ### rRNA amplification
 ![schematic for amplification of 18S/5.8S/partial 28S rRNA cistron, showing wiggly purple line representing DNA, yellow boxes where genes are (overlaid on the purple DNA), and red arrows labelled with primer sequence name at the positions where the primers sit to amplify genes, not to scale](schematics/18Setc.png)
