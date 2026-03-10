@@ -697,3 +697,8 @@ plot_sample_bubbles_COI <- create_bubble_plot(
 )
 plot_sample_bubbles_COI
 ```
+
+```{r versioning}
+sessionInfo()
+```
+

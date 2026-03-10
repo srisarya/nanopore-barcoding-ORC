@@ -116,3 +116,7 @@ joined_df<-left_join(df1,df2, by = c("sample", "barcode")) %>%
   write_csv("../../../DK_amplicon_blasting/names_samples_for_treenames.csv")
 ```
 
+
+```{r versioning}
+sessionInfo()
+```
