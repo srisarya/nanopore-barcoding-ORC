@@ -1,0 +1,122 @@
+---
+title: "Amplicons metadata wrangling"
+author: "Srishti Arya"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+  pdf_document:
+    toc: true
+---
+
+# this is metadata wrangling for filtering contigs by best hit for treebuilding
+
+#setup
+
+```{r}
+library(tidyverse)
+library(Biostrings)
+library(GenomicRanges)
+library(taxonomizr)
+library(ggplot2)
+
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999)
+```
+
+# load data to initially clean
+```{r eval=FALSE, include=FALSE}
+path = "../../../DK_amplicon_blasting/DK_manual_results",
+  pattern = "\\.csv$",
+  full.names = TRUE,
+  recursive = TRUE
+) %>%
+  lapply(function(f)
+    read_csv(
+      f,
+      col_names = TRUE,
+      col_types = cols(.default = col_character())
+    )) %>%
+  bind_rows %>%
+  type.convert(as.is = TRUE) %>%
+  as.data.frame() %>%
+  mutate(
+    final_group = case_when(
+      hit1_expect == "Y" ~ as.character(max_readcount_group),
+      hit2_expect == "Y" ~ as.character(hit2_group),
+      .default = NA
+    ),
+    final_readcount = case_when(
+      hit1_expect == "Y" ~ as.numeric(max_readcount),
+      hit2_expect == "Y" ~ as.numeric(hit2_readcount),
+      .default = NA
+    ),
+    final_primer_set = case_when(
+      hit1_expect == "Y" ~ hit1_primer_set,
+      hit2_expect == "Y" ~ hit2_primer_set,
+      .default = NA
+    ),
+    adapter_name    = paste0(
+      "SP27_",
+      str_pad(SP27, 3, pad = "0"),
+      "_SP5_",
+      str_pad(SP5, 3, pad = "0")
+    )
+  ) %>%
+  select(
+    "plate",
+    "barcode",
+    "sample",
+    "adapter_name",
+    "expected_taxon",
+    "SP5",
+    "SP27",
+    "file_status",
+    "final_expect",
+    "final_group",
+    "final_readcount",
+    "final_primer_set"
+  ) %>% 
+  write_csv("../../../DK_amplicon_blasting/all_DK_BW_blast_fromR.csv")
+# note: manual edits are made to this after the fact because some comments are in some cols (e.g., when tblastx was done)
+```
+
+# getting fasta headers for best hits for trees
+```{r eval=FALSE, include=FALSE}
+df1<-read_csv("../../../DK_amplicon_blasting/all_DK_BW_blast_fromR.csv") %>% 
+  dplyr::rename(dataset = plate) %>%
+  filter(final_expect == "Y") %>%
+  dplyr::mutate(dataset = gsub("BW_", "BWplate", dataset),
+        dataset = gsub("day_", "day", dataset),
+        dataset = gsub("Lakes_", "day", dataset),
+        dataset = gsub("Garden_", "BWplate", dataset),
+        sample = paste0(adapter_name, "_", dataset),
+        barcode = if_else(barcode == "CO1", "COI", barcode),
+        fasta_headers = paste0(sample, "_pass_group", final_group, "_readcount_", final_readcount)) %>% 
+  select(sample, fasta_headers, barcode)
+
+df2 <- read_csv("../../../DK_amplicon_blasting/all_DK_BW_blast_final.csv") %>% 
+  dplyr::rename(dataset = plate, name = new_code) %>%
+  mutate(
+    dataset = gsub("BW_", "BWplate", dataset),
+    dataset = gsub("day_", "day", dataset),
+    dataset = gsub("Lakes_", "day", dataset),
+    dataset = gsub("Garden_", "BWplate", dataset),
+    sample = paste0(sample, "_", dataset),
+    barcode = if_else(barcode == "CO1", "COI", barcode),
+    name = gsub("cf. ", "", name),
+    name = gsub("aff. ", "", name),
+    name = gsub(" ", "_", name)) %>% 
+  distinct(sample, barcode, name, expected_taxon) %>%   # dedup identical rows
+  select(sample, expected_taxon, name, barcode)
+
+joined_df<-left_join(df1,df2, by = c("sample", "barcode")) %>% 
+ drop_na() %>% 
+  write_csv("../../../DK_amplicon_blasting/names_samples_for_treenames.csv")
+```
+
+
+```{r versioning}
+sessionInfo()
+```
