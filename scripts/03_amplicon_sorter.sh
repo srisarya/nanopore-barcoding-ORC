@@ -48,6 +48,7 @@ maximum_size=""
 outfolder_prefix="amplicon"
 
 # Manual argument parsing to support multi-character flags
+# Claude Sonnet v4.5 was used to help wrap argument parsing in shell for this script
 while [ $# -gt 0 ]; do
     case "$1" in
         -input)
@@ -197,6 +198,7 @@ echo "Reformatting consensus headers..."
 seqkit replace -p '\((\d+)\)$' -r '_readcount_$1' "${consensus_file}" > "${consensus_file}.tmp1"
 
 # Step 2: Replace _X_Y patterns with sequential _groupN
+# Claude Sonnet v4.5 was used to help debug the awk lines for this script
 awk '
 BEGIN {counter = 1}
 /^>/ {
