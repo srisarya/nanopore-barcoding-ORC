@@ -65,6 +65,7 @@ blastn \
 echo "BLAST completed successfully"
 
 # filter for top 5 e-value hits
+# Claude Sonnet v4.5 was used to help debug ask lines in this section
 sort -k1,1 -k4,4g "${output_dir}/${dataset}_${gene}_blast.tsv" \
 | awk '{ key=$1; if (key!=prev) {count=0; prev=key} count++; if (count<=5) print }' \
 > "${output_dir}/${dataset}_${gene}_blast_top5.tsv"
