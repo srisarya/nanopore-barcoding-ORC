@@ -69,6 +69,7 @@ amplicon_sorted_dir="$1"
 amplicon_type="$2"
 shift 2
 
+# Claude Sonnet v4.5 was used to help wrap argument parsing in shell for this script
 while [[ $# -gt 0 ]]; do
     case $1 in
         --r1-primers)
@@ -136,10 +137,8 @@ if [ -z "$sample_amplicon_dir" ]; then
     exit 1
 fi
 
-#----------------------------------------#
 echo "Array Task ID: $SLURM_ARRAY_TASK_ID / ${#sample_dirs[@]}"
 echo "Processing: $sample_amplicon_dir"
-#----------------------------------------#
 
 # Get consensus file
 consensus_file=$(find "$sample_amplicon_dir" -type f -name "*_consensus_${amplicon_type}.fasta" | head -n 1)
@@ -163,7 +162,6 @@ output_dir="${basedir}/primerless/${identifier}/${amplicon_type}"
 mkdir -p "$output_dir"
 echo "Output directory: $output_dir"
 
-
 # Define output files
 primerless_fasta_round1="${output_dir}/round1_amplicon_${identifier}.fasta"
 cleanest_fasta_round1="${output_dir}/cleaned_amplicon_${identifier}.fasta"
@@ -175,7 +173,6 @@ temp_primers="${output_dir}/temp_primers_${identifier}.fa"
 temp_primer_locations="${output_dir}/primer_locations_${identifier}.txt"
 temp_sequences_with_primers="${output_dir}/sequences_with_primers_${identifier}.txt"
 
-#----------------------------------------#
 # Parse Round 1 primers and build pairs
 
 echo "--- Parsing Round 1 primers from $r1_primers_file ---"
@@ -263,9 +260,7 @@ if [ -n "$current_header" ] && [ -n "$current_seq" ]; then
     fi
 fi
 
-#----------------------------------------#
 # Parse Round 2 primers if provided
-
 declare -A r2_forward_primers
 declare -A r2_reverse_primers
 declare -a r2_pair_ids
@@ -353,11 +348,9 @@ if [ "$run_round2" = true ] && [ -n "$r2_primers_file" ]; then
     fi
 fi
 
-#----------------------------------------#
 # Activate cutadapt environment
 source activate cutadapt
 
-#----------------------------------------#
 # ROUND 1: Linked primer trimming
 
 echo "--- Round 1: Trimming with linked primers ---"
@@ -386,9 +379,7 @@ echo "Round 1 completed."
 echo "  Trimmed sequences: $primerless_fasta_round1"
 echo "  Untrimmed sequences: $untrimmed_fasta_round1"
 
-#----------------------------------------#
 # FAILSAFE: Check for residual primers using seqkit locate
-
 if [ -f "$primerless_fasta_round1" ] && [ -s "$primerless_fasta_round1" ]; then
     echo "--- Failsafe: Checking for residual primers with seqkit locate ---"
     
@@ -454,7 +445,6 @@ else
     exit 0
 fi
 
-#----------------------------------------#
 # ROUND 2: Unlinked primer trimming (Only if requested)
 if [ "$run_round2" = true ] && [ -s "$untrimmed_fasta_round1" ]; then
     echo "--- Round 2: Trimming untrimmed sequences with unlinked primers ---"
@@ -516,9 +506,7 @@ else
     fi
 fi
 
-#----------------------------------------#
 # Summary
-
 echo "Processing completed for $identifier"
 echo "Final outputs:"
 echo "Clean: $cleanest_fasta_round1"
