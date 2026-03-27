@@ -218,12 +218,11 @@ all_BLAST_barcodes_taxonomy_lca <- all_BLAST_barcodes %>%
   arrange(expected_taxon, name)
 ```
 
-```{r readcounts for all contigs violins, fig.height=4.5, fig.width=3}
+```{r readcounts for all contigs violins, fig.height=3, fig.width=3}
 # readcount violins
 sum_contigs <-
   all_BLAST_barcodes_taxonomy_lca %>% group_by(primer_barcode) %>% summarize(total =
                                                                                n())
-
 readcounts_violins <- all_BLAST_barcodes_taxonomy_lca %>%
   distinct(qseqid, .keep_all = TRUE) %>%
   mutate(qseqid = fct_reorder(qseqid, readcount)) %>%
@@ -257,12 +256,12 @@ readcounts_violins <- all_BLAST_barcodes_taxonomy_lca %>%
 
 readcounts_violins
 
-ggsave(
-  filename = "plots/readcount_violins_log10.pdf",
-  plot = readcounts_violins,
-  width = 3,
-  height = 3
-)
+# ggsave(
+#   filename = "plots/readcount_violins_log10.pdf",
+#   plot = readcounts_violins,
+#   width = 3,
+#   height = 3
+# )
 ```
 
 # lollipops
@@ -380,12 +379,12 @@ plot_phyla_clean_lollipop <- create_lollipop_plot(
 ) +
   labs(x = "")
 
-ggsave(
-  filename = "plots/plot_phyla_clean_lollipop.pdf",
-  plot = plot_phyla_clean_lollipop,
-  width = 3,
-  height = 4
-)
+# ggsave(
+#   filename = "plots/plot_phyla_clean_lollipop.pdf",
+#   plot = plot_phyla_clean_lollipop,
+#   width = 3,
+#   height = 4
+# )
 ```
 
 ## proportions of correctly LCA-BLAST-ing contigs per chosen taxon
@@ -464,15 +463,34 @@ plot_chosen_stacked_proportions <- all_BLAST_barcodes_taxonomy_lca %>%
   create_phylum_proportion_plot_grouped(level_order = target_taxa_for_grouped_stack)
 
 
-ggsave(
-  filename = "plots/plot_chosen_stacked_proportions.pdf",
-  plot = plot_chosen_stacked_proportions,
-  width = 8,
-  height = 5
-)
+# ggsave(
+#   filename = "plots/plot_chosen_stacked_proportions.pdf",
+#   plot = plot_chosen_stacked_proportions,
+#   width = 8,
+#   height = 5
+# )
 ```
 
-# supplementary figures
+# supplementary figures and tables
+## average readcounts for barcodes
+```{r}
+all_BLAST_barcodes_taxonomy_lca %>% 
+  distinct(qseqid, .keep_all = TRUE) %>% 
+  group_by(primer_barcode) %>% 
+  summarise(
+    Min       = min(readcount),
+    Q1        = quantile(readcount, 0.25),
+    Median    = median(readcount),
+    Mean      = mean(readcount),
+    Q3        = quantile(readcount, 0.75),
+    Max       = max(readcount),
+    .groups   = "drop"
+  ) %>% 
+  dplyr::rename("Barcode and Primer" = "primer_barcode") %>% 
+  write.csv("plots/mean_readcounts_per_barcode.csv", row.names = FALSE)
+```
+
+
 ## lorenz plot for readcounts per contig
 ```{r readcount for all contigs lorenz curve}
 make_lorenz_readcounts <- function(data) {
@@ -494,13 +512,13 @@ lorenz_readcounts <-
   make_lorenz_readcounts()
 lorenz_readcounts
 
-ggsave(
-  filename = "plots/readcount_lorenz.pdf",
-  plot = lorenz_readcounts,
-  width = 7,
-  height = 7,
-  device = cairo_pdf
-)
+# ggsave(
+#   filename = "plots/readcount_lorenz.pdf",
+#   plot = lorenz_readcounts,
+#   width = 7,
+#   height = 7,
+#   device = cairo_pdf
+# )
 ```
 
 ## number of contigs per primer_set~barcode
@@ -526,12 +544,12 @@ primer_set_dataset_hits <-
 
 primer_set_dataset_hits
 
-ggsave(
-  filename = "plots/primer_set_dataset_hits.pdf",
-  plot = primer_set_dataset_hits,
-  width = 3.5,
-  height = 3
-)
+# ggsave(
+#   filename = "plots/primer_set_dataset_hits.pdf",
+#   plot = primer_set_dataset_hits,
+#   width = 3.5,
+#   height = 3
+# )
 ```
 
 ## more lollipop plots
@@ -552,10 +570,10 @@ plot_lca_lollipop <- create_lollipop_plot(all_BLAST_barcodes_taxonomy_lca,
                                           lca,
                                           facet_vars = c("primer_set", "barcode"))
 
-ggsave(filename = "plots/plot_lca_lollipop.pdf", 
-       plot = plot_lca_lollipop, 
-       width = 15, height = 55,
-       limitsize = FALSE)
+# ggsave(filename = "plots/plot_lca_lollipop.pdf", 
+#        plot = plot_lca_lollipop, 
+#        width = 15, height = 55,
+#        limitsize = FALSE)
 ```
 
 
