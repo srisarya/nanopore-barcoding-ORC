@@ -22,6 +22,7 @@ library(ggtree)
 library(treeio)
 library(tidytree)
 library(patchwork)
+library(ggnewscale)
 
 knitr::opts_chunk$set(echo = TRUE)
 options(scipen = 999)
@@ -36,12 +37,11 @@ plate_map <- c(
 )
 
 blast_best_contigs_results <- "~/Library/CloudStorage/OneDrive-QueenMary,UniversityofLondon/SrishtiArya_AllWork/Projects/local_R/ORC_barcoding_analysis/DK_amplicon_blasting/all_DK_BW_blast_final.csv"
-taxonomizr_sql   <- '../../../accessionTaxa.sql'
+taxonomizr_sql <- '../../../accessionTaxa.sql'
 ```
 
 # Helper functions
 ```{r functions}
-# load and filter BLAST results for a given taxon + barcode
 load_blast <- function(taxon, barcode) {
   read_csv(blast_best_contigs_results) %>%
     filter(expected_taxon == taxon & barcode == !!barcode) %>%
@@ -51,7 +51,6 @@ load_blast <- function(taxon, barcode) {
     )
 }
 
-# build metadata table: taxonomy lookup + label cleaning
 build_meta <- function(meta_path, blast_df, extra_mutate = NULL) {
   meta <- read_csv(meta_path) %>%
     dplyr::select(label, type) %>%
@@ -84,27 +83,27 @@ build_meta <- function(meta_path, blast_df, extra_mutate = NULL) {
     dplyr::mutate(
       label_clean = case_when(
         type == "sample" ~ label %>%
-          gsub("day(\\d+)", "Lakes\\1", .) %>%
-          gsub("BWplate(\\d+)", "Gardens\\1", .),
+          gsub("day(\\d+)", "L\\1", .) %>%
+          gsub("BWplate(\\d+)", "G\\1", .) %>%
+          gsub("SP27_0*(\\d+)_SP5_0*(\\d+)", "SP27\\1SP5\\2", .) %>%
+          gsub("_", " ", .) %>%
+          gsub(" (L|G)(\\d+)$", "\\1\\2", .),
         type == "anchor" & !is.na(species) ~ paste(accession_noversion, species, sep = " "),
         type == "anchor"                   ~ accession_noversion,
         TRUE                               ~ label
       ),
       dataset = case_when(
         type == "anchor"                                 ~ "anchor",
-        type == "sample" & grepl("Garden", label_clean) ~ "Gardens",
+        type == "sample" & grepl("G", label_clean)      ~ "Gardens",
         type == "sample"                                 ~ "Lakes",
         TRUE                                             ~ NA_character_
       )
     )
 
-  # apply any taxon-specific extra mutations (e.g. clade column for Platy)
   if (!is.null(extra_mutate)) meta <- extra_mutate(meta)
-
   meta
 }
 
-# build tip label remapping (primary + fallback accession maps)
 build_label_map <- function(meta) {
   map1 <- setNames(meta$label_clean, meta$original_label)
   map2 <- setNames(meta$label_clean, meta$accession_noversion)
@@ -114,17 +113,19 @@ build_label_map <- function(meta) {
     map3[!names(map3) %in% names(map1)])
 }
 
-# root, relabel, and scale a tree
-prepare_tree <- function(tree, outgroup, label_map, scale_factor = 0.0005) {
-  rooted             <- ape::root(tree, outgroup = outgroup, resolve.root = TRUE)
+# reads with treeio to preserve bootstrap values, then roots + relabels + scales
+prepare_tree <- function(tree_path, outgroup, label_map, scale_factor = 0.0005) {
+  raw                <- treeio::read.iqtree(tree_path)
+  rooted             <- ape::root(as.phylo(raw), outgroup = outgroup, resolve.root = TRUE)
   rooted$tip.label   <- unname(label_map[rooted$tip.label])
-  rooted$node.label  <- NULL
   rooted$edge.length <- rooted$edge.length * scale_factor
+  # re-attach bootstrap as node.label after rooting
+  boot_df            <- as_tibble(raw) %>% dplyr::select(label, UFboot) %>% filter(!is.na(UFboot))
+  rooted$node.label  <- boot_df$UFboot[match(rooted$node.label, boot_df$label)]
   rooted
 }
 
-# get MRCA node for each clade from anchor tips
-get_clade_nodes <- function(meta, tree, group_var = "order", clade_col = "clade") {
+get_clade_nodes <- function(meta, tree, group_var = "order") {
   meta %>%
     filter(type == "anchor", !is.na(.data[[group_var]])) %>%
     group_by(across(all_of(group_var))) %>%
@@ -140,7 +141,6 @@ get_clade_nodes <- function(meta, tree, group_var = "order", clade_col = "clade"
     dplyr::rename(clade = all_of(group_var))
 }
 
-# build node_data tibble (clade assignments + metadata join)
 build_node_data <- function(tree, clade_nodes, meta) {
   tree_tbl   <- tidytree::as_tibble(tree)
   node_clade <- rep(NA_character_, max(tree$edge))
@@ -152,30 +152,42 @@ build_node_data <- function(tree, clade_nodes, meta) {
   }
 
   tree_tbl %>%
-    dplyr::mutate(clade = ifelse(is.na(node_clade[node]), "other", node_clade[node])) %>%
+    dplyr::mutate(
+      clade     = ifelse(is.na(node_clade[node]), "other", node_clade[node]),
+      bootstrap = as.numeric(label)
+    ) %>%
     dplyr::left_join(meta, by = c("label" = "label_clean"))
 }
 
-# build the ggtree plot
-plot_tree <- function(tree, node_data, clade_nodes) {
-  ggtree(tree, colour = "black", size = 0.5) %<+% node_data +
+plot_tree <- function(tree, node_data) {
+  ggtree(tree, colour = "black", size = 0.1) %<+% node_data +
     geom_tiplab(aes(colour = dataset), size = 1) +
     scale_colour_manual(
       values   = c(anchor = "grey30", Lakes = "deepskyblue3", Gardens = "darkolivegreen4"),
       na.value = "grey80",
       name     = "Dataset"
     ) +
-    geom_cladelab(
-      data        = clade_nodes,
-      mapping     = aes(node = node, label = clade),
-      fontsize    = 1,
-      fontface    = "italic",
-      offset.text = 0.000075,
-      align       = TRUE,
-      barsize     = 0,
-      barcolour   = NA
+    ggnewscale::new_scale_fill() +
+    geom_nodepoint(
+      aes(
+        subset = !isTip & !is.na(bootstrap),
+        fill   = case_when(
+          bootstrap == 100 ~ "100",
+          bootstrap >= 90  ~ "90-99",
+          TRUE             ~ "<90"
+        )
+      ),
+      shape  = 21,
+      size   = 0.5,
+      stroke = 0.1,   
+      colour = "black"
     ) +
-    geom_treescale(fontsize = 0.5, linesize = 0.5, offset = -1.5) +
+    scale_fill_manual(
+      values = c("100" = "black", "90-99" = "grey60", "<90" = "white"),
+      name   = "Bootstrap"
+    ) +
+    geom_treescale(fontsize = 1, linesize = 0.5, offset = -1.5) +
+    geom_rootedge(rootedge = 0.00005,linewidth = 0.1)+
     theme(legend.position = "bottom")
 }
 ```
@@ -183,32 +195,29 @@ plot_tree <- function(tree, node_data, clade_nodes) {
 # Nematoda 18S
 ```{r nem_18S}
 nem_blast_18S <- load_blast("Nematoda", "18S")
+nem_meta_18S  <- build_meta("../../../trees/Nematoda_18S/Nematoda_18S_metadata.csv", nem_blast_18S)
 
-nem_meta_18S <- build_meta("../../../trees/Nematoda_18S/Nematoda_18S_metadata.csv",
-                           nem_blast_18S)
-
-nem_18S_raw  <- ggtree::read.tree("../../../trees/Nematoda_18S/iqtree/custom_Nematoda_18S.treefile")
-
-# root on Enoplida using original labels
 enoplida_tips <- nem_meta_18S %>%
-  filter(order == "Enoplida") %>%
+  filter(grepl("Ironus", label)) %>%
   pull(original_label) %>%
-  intersect(nem_18S_raw$tip.label)
+  intersect(treeio::read.iqtree("../../../trees/Nematoda_18S/iqtree/custom_Nematoda_18S.treefile") %>%
+              as.phylo() %>% .$tip.label)
 
-nem_18S_tree_rooted <- prepare_tree(nem_18S_raw, enoplida_tips, build_label_map(nem_meta_18S))
+nem_18S_tree_rooted <- prepare_tree(
+  "../../../trees/Nematoda_18S/iqtree/custom_Nematoda_18S.treefile",
+  enoplida_tips,
+  build_label_map(nem_meta_18S)
+)
 
 nem_clade_nodes_18S <- get_clade_nodes(nem_meta_18S, nem_18S_tree_rooted, group_var = "order")
 nem_node_data_18S   <- build_node_data(nem_18S_tree_rooted, nem_clade_nodes_18S, nem_meta_18S)
-nem_18S_plot        <- plot_tree(nem_18S_tree_rooted, nem_node_data_18S, nem_clade_nodes_18S)
-
-nem_18S_plot
+nem_18S_plot        <- plot_tree(nem_18S_tree_rooted, nem_node_data_18S)
 ```
 
 # Platyhelminthes 28S
 ```{r platy_28S}
 platy_blast_28S <- load_blast("Platyhelminthes", "28S")
-
-platy_meta_28S <- build_meta(
+platy_meta_28S  <- build_meta(
   "../../../trees/Platyhelminthes_28S/manual_test/tip_metadata.csv",
   platy_blast_28S,
   extra_mutate = function(m) mutate(m, clade = case_when(
@@ -217,75 +226,100 @@ platy_meta_28S <- build_meta(
   ))
 )
 
-platy_28S_raw <- ggtree::read.tree("../../../trees/Platyhelminthes_28S/manual_test/realigned/platyhelminthes_28S.treefile")
+platy_28S_raw <- treeio::read.iqtree("../../../trees/Platyhelminthes_28S/manual_test/realigned/platyhelminthes_28S.treefile") %>%
+  as.phylo() %>%
+  ape::drop.tip(c(
+    "AJ228800.1_1312376_AJ228800.1_Kronborgia_isopodicola_partial_28S_rRNA_gene_668",
+    "LC512875.1_6169_LC512875.1_Cheliplana_sp._2_NJ_2019_gene_for_28S_ribosomal_RNA__partial_sequence_536",
+    "KM588103.1_27901_KM588103.1_Diceratocephala_boschmai_voucher_SWU51410_28S_ribosomal_RNA_gene__partial_sequence_550",
+    "KC869885.1_27901_KC869885.1_Bresslauilla_relicta_28S_ribosomal_RNA_genes__partial_sequence_2103",
+    "AJ313232.1_27901_AJ313232.1_Graffilla_buccinicola_partial_28S_rRNA_gene_1250",
+    "KC529640.1_27901_KC529640.1_Solenopharyngidae_sp._NVS_2013_isolate_UH356.2_28S_ribosomal_RNA_gene__partial_sequence_1634",
+    "AF022754.1_27901_AF022754.1_Provortex_psammophilus_28S_ribosomal_RNA_gene__partial_sequence_828",
+    "KC529544.1_27901_KC529544.1_Trigonostomum_setigerum_isolate_UH330.9_28S_ribosomal_RNA_gene__partial_sequence_1696",
+    "AJ315645.1_27901_AJ315645.1_Maehrenthalia_agilis_partial_28S_rRNA_gene_1299",
+    "JN009787.1_6159_JN009787.1_Pentacoelum_hispaniense_28S_ribosomal_RNA_gene__partial_sequence_1600",
+    "AJ313218.1_79788_AJ313218.1_Protomonotresis_centrophora_partial_28S_rRNA_gene_1268",
+    "AJ313214.1_79788_AJ313214.1_Allostoma_pallidum_partial_28S_rRNA_gene_1252",
+    "AJ313230.1_1312376_AJ313230.1_Urastoma_cyprinae_partial_28S_rRNA_gene_1165"
+  ))
 
-tips_to_drop <- c(
-  "AJ228800.1_1312376_AJ228800.1_Kronborgia_isopodicola_partial_28S_rRNA_gene_668",
-  "LC512875.1_6169_LC512875.1_Cheliplana_sp._2_NJ_2019_gene_for_28S_ribosomal_RNA__partial_sequence_536",
-  "KM588103.1_27901_KM588103.1_Diceratocephala_boschmai_voucher_SWU51410_28S_ribosomal_RNA_gene__partial_sequence_550",
-  "KC869885.1_27901_KC869885.1_Bresslauilla_relicta_28S_ribosomal_RNA_genes__partial_sequence_2103",
-  "AJ313232.1_27901_AJ313232.1_Graffilla_buccinicola_partial_28S_rRNA_gene_1250",
-  "KC529640.1_27901_KC529640.1_Solenopharyngidae_sp._NVS_2013_isolate_UH356.2_28S_ribosomal_RNA_gene__partial_sequence_1634",
-  "AF022754.1_27901_AF022754.1_Provortex_psammophilus_28S_ribosomal_RNA_gene__partial_sequence_828",
-  "KC529544.1_27901_KC529544.1_Trigonostomum_setigerum_isolate_UH330.9_28S_ribosomal_RNA_gene__partial_sequence_1696",
-  "AJ315645.1_27901_AJ315645.1_Maehrenthalia_agilis_partial_28S_rRNA_gene_1299",
-  "JN009787.1_6159_JN009787.1_Pentacoelum_hispaniense_28S_ribosomal_RNA_gene__partial_sequence_1600",
-  "AJ313218.1_79788_AJ313218.1_Protomonotresis_centrophora_partial_28S_rRNA_gene_1268",
-  "AJ313214.1_79788_AJ313214.1_Allostoma_pallidum_partial_28S_rRNA_gene_1252",
-  "AJ313230.1_1312376_AJ313230.1_Urastoma_cyprinae_partial_28S_rRNA_gene_1165"
-)
-
-platy_28S_reduced <- ape::drop.tip(platy_28S_raw, tips_to_drop)
-
-# root on most basal Catenulidae tip
-cat_tips   <- platy_meta_28S %>% filter(family == "Catenulidae") %>% pull(label)
-cat_dists  <- cophenetic(platy_28S_reduced)[cat_tips, ]
+cat_tips   <- platy_meta_28S %>% filter(family == "Catenulidae" | family == "Stenostomidae") %>% pull(label)
+cat_dists  <- cophenetic(platy_28S_raw)[cat_tips, ]
 most_basal <- names(which.max(rowMeans(cat_dists)))
 
-platy_28S_tree_rooted <- prepare_tree(platy_28S_reduced, most_basal, build_label_map(platy_meta_28S))
+platy_28S_tmp <- tempfile(fileext = ".tree")
+ape::write.tree(platy_28S_raw, file = platy_28S_tmp)
+
+platy_28S_tree_rooted <- prepare_tree(
+  platy_28S_tmp,
+  most_basal,
+  build_label_map(platy_meta_28S)
+)
 
 platy_clade_nodes_28S <- get_clade_nodes(platy_meta_28S, platy_28S_tree_rooted, group_var = "clade")
 platy_node_data_28S   <- build_node_data(platy_28S_tree_rooted, platy_clade_nodes_28S, platy_meta_28S)
-platy_28S_plot        <- plot_tree(platy_28S_tree_rooted, platy_node_data_28S, platy_clade_nodes_28S)
-
-platy_28S_plot
+platy_28S_plot        <- plot_tree(platy_28S_tree_rooted, platy_node_data_28S)
 ```
 
 # Annelida COI
 ```{r ane_COI}
 ane_blast_COI <- load_blast("Annelida", "COI")
+ane_meta_COI  <- build_meta(
+  "../../../trees/Annelida_COI/Annelida_COI_custom/Annelida_COI_custom_metadata.csv",
+  ane_blast_COI
+)
+ane_COI_raw <- treeio::read.iqtree("../../../trees/Annelida_COI/Annelida_COI_custom/iqtree/custom_Annelida_COI.treefile") %>%
+  as.phylo() %>%
+  ape::drop.tip(c(
+    "ANE_4_Sauron_SP27_001_SP5_006_BWplate1",
+    "ANE_1_Sauron_SP27_002_SP5_003_BWplate1",
+    "ANE_25_Sauron_SP27_004_SP5_001_BWplate1",
+    "ANE_6_Sauron_SP27_005_SP5_007_BWplate1",
+    "ANE_10_Sauron_SP27_005_SP5_008_BWplate1",
+    "ANE_12_Sauron_SP27_005_SP5_011_BWplate1",
+    "ANE_15_Sauron_SP27_007_SP5_001_BWplate1",
+    "ANE_14_Sauron_SP27_004_SP5_002_BWplate2",
+    "ANE_19_Sauron_SP27_006_SP5_002_BWplate2",
+    "ANE_24_Sauron_SP27_007_SP5_002_BWplate2",
+    "ANE_21_Sauron_SP27_007_SP5_008_BWplate2",
+    "ANE_23_Sauron_SP27_008_SP5_002_BWplate2",
+    "Enchytraeus_Sauron_SP27_001_SP5_005_day1",
+    "Marionina_Sauron_SP27_002_SP5_005_day1",
+    "Vejdovskyella_comata_Sauron_SP27_001_SP5_006_day2"
+  ))
 
-ane_meta_COI <- build_meta("../../../trees/Annelida_COI/Annelida_COI_custom/Annelida_COI_custom_metadata.csv",
-                            ane_blast_COI)
-
-ane_COI_raw <- ggtree::read.tree("../../../trees/Annelida_COI/Annelida_COI_custom/iqtree/custom_Annelida_COI.treefile")
+ane_COI_tmp <- tempfile(fileext = ".tree")
+ape::write.tree(ane_COI_raw, file = ane_COI_tmp)
 
 ane_COI_tree_rooted <- prepare_tree(
-  ane_COI_raw,
-  outgroup     = "PV442811.1_42113_PV442811.1_Aeolosomatidae_sp._Biologic_POLY003_voucher_BMR05135_cytochrome_c_oxidase_subunit_I__COX1__gene__partial_cds__mitochondrial_658",
-  label_map    = build_label_map(ane_meta_COI)
+  ane_COI_tmp,
+  outgroup  = "PV442811.1_42113_PV442811.1_Aeolosomatidae_sp._Biologic_POLY003_voucher_BMR05135_cytochrome_c_oxidase_subunit_I__COX1__gene__partial_cds__mitochondrial_658",
+  build_label_map(ane_meta_COI)
 )
 
 ane_clade_nodes_COI <- get_clade_nodes(ane_meta_COI, ane_COI_tree_rooted, group_var = "order")
 ane_node_data_COI   <- build_node_data(ane_COI_tree_rooted, ane_clade_nodes_COI, ane_meta_COI)
-ane_COI_plot        <- plot_tree(ane_COI_tree_rooted, ane_node_data_COI, ane_clade_nodes_COI)
+ane_node_data_COI<- ane_node_data_COI %>% 
+  mutate(label = gsub("Moorea|Sauron", "", label))
+ane_COI_tree_rooted$tip.label <- gsub("Moorea|Sauron", "", ane_COI_tree_rooted$tip.label)
 
-ane_COI_plot
+ane_COI_plot        <- plot_tree(ane_COI_tree_rooted, ane_node_data_COI)
 ```
 
 # Combined figure
-```{r patchwork}
+```{r patchwork, fig.height=8, fig.width=11}
 patch_trees <- nem_18S_plot + platy_28S_plot + ane_COI_plot +
   plot_layout(guides = "collect") +
   plot_annotation(tag_levels = "A") &
   theme(legend.position = "bottom")
 
-patch_trees
-
 ggsave(
   plot     = patch_trees,
-  filename = "plots/trees/patchwork_tree.pdf",
+  filename = "plots/trees/patchwork_tree_nolabels_bootstrap.pdf",
   height   = 8,
   width    = 11
 )
 ```
+
+
