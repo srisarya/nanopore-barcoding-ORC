@@ -19,7 +19,6 @@ Required arguments:
 Optional arguments:
   --r2-primers <file>      FASTA file with Round 2 primers (unlinked, degenerate bases permitted)
   --run-round2             Run Round 2 trimming on untrimmed sequences (default: skip Round 2)
-  --cluster-round1         Cluster Round 1 output sequences with cd-hit-est
 
 Primer FASTA format:
   - Headers must contain "Forward" or "Reverse" to indicate primer orientation
@@ -173,7 +172,6 @@ echo "Output directory: $output_dir"
 # Define output files
 primerless_fasta_round1="${output_dir}/round1_amplicon_${identifier}.fasta"
 cleanest_fasta_round1="${output_dir}/cleaned_amplicon_${identifier}.fasta"
-clustered_fasta_round1="${output_dir}/clustered_clean_amplicon_${identifier}.fasta"
 untrimmed_fasta_round1="${output_dir}/untrimmed_round1_${identifier}.fasta"
 primerless_fasta_round2="${output_dir}/wrong_primers_${identifier}.fasta"
 
@@ -462,30 +460,6 @@ else
 fi
 
 
-# OPTIONAL: Cluster Round 1 sequences
-if [ "$cluster_round1" = true ]; then
-    if [ -f "$cleanest_fasta_round1" ] && [ -s "$cleanest_fasta_round1" ]; then
-        echo "--- Clustering Round 1 sequences ---"
-        conda deactivate && source activate cd-hit
-        
-        cd-hit-est \
-            -i "$cleanest_fasta_round1" \
-            -o "$clustered_fasta_round1" \
-            -c 0.97 \
-            -T "$SLURM_CPUS_PER_TASK" \
-            -M 2000
-        
-        echo "Round 1 clustering completed: $clustered_fasta_round1"
-        echo "Round 1 cluster info: ${clustered_fasta_round1}.clstr"
-        
-        # Reactivate cutadapt for potential Round 2
-        conda deactivate && source activate cutadapt
-    else
-        echo "No sequences in Round 1 to cluster"
-    fi
-fi
-
-
 # ROUND 2: Unlinked primer trimming (Only if requested)
 if [ "$run_round2" = true ] && [ -s "$untrimmed_fasta_round1" ]; then
     echo "--- Round 2: Trimming untrimmed sequences with unlinked primers ---"
@@ -553,9 +527,6 @@ fi
 echo "Processing completed for $identifier"
 echo "Final outputs:"
 echo "  Round 1 (clean): $cleanest_fasta_round1"
-if [ "$cluster_round1" = true ] && [ -f "$clustered_fasta_round1" ]; then
-    echo "  Round 1 (clustered): $clustered_fasta_round1"
-fi
 if [ "$run_round2" = true ] && [ -f "$primerless_fasta_round2" ]; then
     echo "  Round 2 (wrong primers): $primerless_fasta_round2"
 fi
