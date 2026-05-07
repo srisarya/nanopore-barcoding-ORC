@@ -41,7 +41,7 @@
      * The amplicon sorter step splits samples' reads by size and clusters them by sequence
      * The variables (min length, max length, prefix name for amplicon type, and input folder) are user-defined :)
   
-  4. `04a_cleaning_primers.sh`: `sbatch $0 <amplicon_sorted_dir> <amplicon_type> --r1-primers <file> --r2-primers <file> [--run-round2 --cluster-round1]`
+  4. `04a_cleaning_primers.sh`: `sbatch $0 <amplicon_sorted_dir> <amplicon_type> --r1-primers <file> --r2-primers <file> [--run-round2]`
        * This script takes each clustered (amplicon-sorted) file and removes the primer sequences from the amplicon sequences, since these are synthetic
        * The user can define the primer sequences to remove based on the amplicon they are sequencing, but if more than one amplicon was sequenced in a run, the other primer sets can also be submitted as a back check
        * Sequences with lone primers, mismatched primers, or >1 primer of a kind are removed in a failsafe
